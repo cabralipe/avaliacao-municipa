@@ -1,0 +1,11 @@
+django
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+python-dotenv
+psycopg2-binary
+qrcode[pil]
+pydantic[dotenv]
+jinja2
+playwright
+django-filter

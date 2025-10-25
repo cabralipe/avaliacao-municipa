@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ titulo }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0 auto; width: 90%; }
+      h1 { text-align: center; }
+      .header { margin-bottom: 20px; }
+      .qr { text-align: right; }
+      ol { padding-left: 1.2em; }
+      li { margin-bottom: 1em; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>{{ titulo }}</h1>
+      <p>Aluno: {{ aluno_nome }} — Turma: {{ turma_nome }}</p>
+    </div>
+    <div class="qr">
+      <img src="data:image/png;base64,{{ qr_png_b64 }}" alt="QR Code" />
+    </div>
+    <ol>
+      {% for q in questoes %}
+        <li>{{ q.enunciado }}</li>
+      {% endfor %}
+    </ol>
+  </body>
+</html>
