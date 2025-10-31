@@ -7,12 +7,14 @@ class RespostaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Resposta
         fields = '__all__'
+        read_only_fields = ['secretaria']
 
 
 class GabaritoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gabarito
         fields = '__all__'
+        read_only_fields = ['secretaria']
 
 
 class RespostaInSerializer(serializers.Serializer):

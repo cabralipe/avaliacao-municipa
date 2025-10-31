@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Optional, Type
 
-from rest_framework import permissions
+from django.db import models
+from rest_framework import exceptions, permissions
 from rest_framework.request import Request
 from rest_framework.viewsets import ModelViewSet
 
@@ -31,5 +32,55 @@ class TenantScopedViewSet(ModelViewSet):
             return queryset.none()
         return queryset.filter(**{f"{self.tenant_field}_id": user_sec})
 
+    # Helpers -----------------------------------------------------------------
+
+    def _get_tenant_model(self) -> Type[models.Model]:
+        field = self.get_queryset().model._meta.get_field(self.tenant_field)
+        if not isinstance(field, models.ForeignKey):
+            raise exceptions.ValidationError({self.tenant_field: 'Campo de tenant inválido.'})
+        return field.remote_field.model
+
+    def _tenant_allows_null(self) -> bool:
+        field = self.get_queryset().model._meta.get_field(self.tenant_field)
+        return getattr(field, 'null', False)
+
+    def _resolve_tenant(self, instance: Optional[models.Model] = None) -> Optional[models.Model]:
+        """Determina a secretaria que deve ser aplicada na operação atual."""
+
+        field_name = self.tenant_field
+        user = self.request.user
+        user_role = getattr(user, 'role', '')
+
+        if user_role == 'superadmin':
+            data = getattr(self.request, 'data', {}) or {}
+            raw_value = data.get(f'{field_name}_id') or data.get(field_name)
+            if raw_value in (None, '', 'null'):
+                return getattr(instance, field_name, None) if instance is not None else None
+            tenant_model = self._get_tenant_model()
+            try:
+                return tenant_model.objects.get(pk=raw_value)
+            except tenant_model.DoesNotExist:  # type: ignore[attr-defined]
+                raise exceptions.ValidationError({field_name: 'Secretaria informada não existe.'})
+            except (TypeError, ValueError):
+                raise exceptions.ValidationError({field_name: 'Valor inválido para secretaria.'})
+
+        tenant = getattr(user, field_name, None)
+        if tenant is None:
+            if self._tenant_allows_null():
+                return None
+            raise exceptions.ValidationError({'detail': 'Usuário não está vinculado a uma secretaria.'})
+        return tenant
+
     def perform_create(self, serializer):
-        serializer.save(**{self.tenant_field: self.request.user.secretaria})
+        tenant = self._resolve_tenant()
+        save_kwargs = {}
+        if tenant is not None or not self._tenant_allows_null():
+            save_kwargs[self.tenant_field] = tenant
+        serializer.save(**save_kwargs)
+
+    def perform_update(self, serializer):
+        tenant = self._resolve_tenant(instance=serializer.instance)
+        save_kwargs = {}
+        if tenant is not None or not self._tenant_allows_null():
+            save_kwargs[self.tenant_field] = tenant
+        serializer.save(**save_kwargs)

@@ -320,4 +320,3 @@ class Command(BaseCommand):
                         'correta': None,
                     },
                 )
-*** End Patch
