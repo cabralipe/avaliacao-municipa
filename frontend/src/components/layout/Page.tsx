@@ -54,7 +54,7 @@ export function PageSection({ children, sx, ...rest }: PageSectionProps) {
     <Paper
       sx={{
         p: { xs: 2.5, md: 4 },
-        borderRadius: 24,
+        borderRadius: 2,
         backdropFilter: 'blur(8px)',
         ...sx
       }}
