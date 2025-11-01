@@ -18,6 +18,8 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
+import { formatINEP, unformatINEP } from '../../utils/inep';
+
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import type { Escola } from '../../types';
@@ -44,7 +46,10 @@ export function EscolasPage() {
 
   useEffect(() => {
     if (editing) {
-      setForm({ nome: editing.nome, codigo_inep: editing.codigo_inep });
+      setForm({ 
+        nome: editing.nome, 
+        codigo_inep: formatINEP(editing.codigo_inep || '') 
+      });
     } else {
       setForm({ nome: '', codigo_inep: '' });
     }
@@ -52,10 +57,16 @@ export function EscolasPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: EscolaInput) => {
+      // Remove formatação do código INEP antes de enviar
+      const payloadWithUnformattedINEP = {
+        ...payload,
+        codigo_inep: unformatINEP(payload.codigo_inep)
+      };
+      
       if (editing) {
-        await apiClient.put(`/escolas/escolas/${editing.id}/`, payload);
+        await apiClient.put(`/escolas/escolas/${editing.id}/`, payloadWithUnformattedINEP);
       } else {
-        await apiClient.post('/escolas/escolas/', payload);
+        await apiClient.post('/escolas/escolas/', payloadWithUnformattedINEP);
       }
     },
     onSuccess: () => {
@@ -104,7 +115,16 @@ export function EscolasPage() {
               <TextField
                 label="Código INEP"
                 value={form.codigo_inep}
-                onChange={(event) => setForm((prev) => ({ ...prev, codigo_inep: event.target.value }))}
+                onChange={(event) => {
+                  const formattedValue = formatINEP(event.target.value);
+                  setForm((prev) => ({ ...prev, codigo_inep: formattedValue }));
+                }}
+                placeholder="12345678"
+                inputProps={{
+                  maxLength: 8,
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*'
+                }}
                 fullWidth
               />
             </Grid>

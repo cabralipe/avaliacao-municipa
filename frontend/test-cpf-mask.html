@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Máscara CPF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste da Máscara de CPF</h1>
+    
+    <div class="form-group">
+        <label for="cpf">CPF:</label>
+        <input type="text" id="cpf" placeholder="000.000.000-00" maxlength="14">
+    </div>
+    
+    <div class="result">
+        <strong>Valor formatado:</strong> <span id="formatted"></span><br>
+        <strong>Valor sem formatação:</strong> <span id="unformatted"></span>
+    </div>
+
+    <script>
+        // Função para remover caracteres não numéricos
+        function removeNonNumeric(value) {
+            return value.replace(/\D/g, '');
+        }
+
+        // Função para formatar CPF
+        function formatCPF(value) {
+            const numericValue = removeNonNumeric(value);
+            const limitedValue = numericValue.slice(0, 11);
+            
+            if (limitedValue.length <= 3) {
+                return limitedValue;
+            } else if (limitedValue.length <= 6) {
+                return `${limitedValue.slice(0, 3)}.${limitedValue.slice(3)}`;
+            } else if (limitedValue.length <= 9) {
+                return `${limitedValue.slice(0, 3)}.${limitedValue.slice(3, 6)}.${limitedValue.slice(6)}`;
+            } else {
+                return `${limitedValue.slice(0, 3)}.${limitedValue.slice(3, 6)}.${limitedValue.slice(6, 9)}-${limitedValue.slice(9)}`;
+            }
+        }
+
+        // Função para remover formatação
+        function unformatCPF(value) {
+            return removeNonNumeric(value);
+        }
+
+        // Aplicar máscara ao input
+        const cpfInput = document.getElementById('cpf');
+        const formattedSpan = document.getElementById('formatted');
+        const unformattedSpan = document.getElementById('unformatted');
+
+        cpfInput.addEventListener('input', function(event) {
+            const formattedValue = formatCPF(event.target.value);
+            event.target.value = formattedValue;
+            
+            formattedSpan.textContent = formattedValue;
+            unformattedSpan.textContent = unformatCPF(formattedValue);
+        });
+    </script>
+</body>
+</html>

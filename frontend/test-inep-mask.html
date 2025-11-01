@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Máscara Código INEP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .demo-values {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .demo-values p {
+            margin: 5px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste - Máscara Código INEP</h1>
+        
+        <div class="form-group">
+            <label for="codigo-inep">Código INEP (8 dígitos numéricos):</label>
+            <input 
+                type="text" 
+                id="codigo-inep" 
+                placeholder="12345678"
+                maxlength="8"
+                inputmode="numeric"
+                pattern="[0-9]*"
+            >
+        </div>
+
+        <div class="info">
+            <h3>Funcionalidades da Máscara:</h3>
+            <ul>
+                <li>✅ Permite apenas números (0-9)</li>
+                <li>✅ Limita a exatamente 8 dígitos</li>
+                <li>✅ Remove automaticamente caracteres não numéricos</li>
+                <li>✅ Validação de 8 dígitos completos</li>
+            </ul>
+        </div>
+
+        <div class="demo-values">
+            <p><strong>Valor formatado:</strong> <span id="formatted-value">—</span></p>
+            <p><strong>Valor sem formatação:</strong> <span id="unformatted-value">—</span></p>
+            <p><strong>É válido:</strong> <span id="is-valid">—</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Funções utilitárias para código INEP
+        function removeNonNumeric(value) {
+            return value.replace(/\D/g, '');
+        }
+
+        function formatINEP(value) {
+            const numericOnly = removeNonNumeric(value);
+            return numericOnly.slice(0, 8);
+        }
+
+        function unformatINEP(value) {
+            return removeNonNumeric(value);
+        }
+
+        function validateINEP(value) {
+            const numericOnly = removeNonNumeric(value);
+            return numericOnly.length === 8;
+        }
+
+        // Aplicar máscara ao campo
+        const inepInput = document.getElementById('codigo-inep');
+        const formattedValueSpan = document.getElementById('formatted-value');
+        const unformattedValueSpan = document.getElementById('unformatted-value');
+        const isValidSpan = document.getElementById('is-valid');
+
+        inepInput.addEventListener('input', function(event) {
+            const formattedValue = formatINEP(event.target.value);
+            event.target.value = formattedValue;
+            
+            // Atualizar valores de demonstração
+            formattedValueSpan.textContent = formattedValue || '—';
+            unformattedValueSpan.textContent = unformatINEP(formattedValue) || '—';
+            isValidSpan.textContent = validateINEP(formattedValue) ? '✅ Sim' : '❌ Não';
+            isValidSpan.style.color = validateINEP(formattedValue) ? 'green' : 'red';
+        });
+
+        // Demonstração inicial
+        inepInput.value = '';
+        formattedValueSpan.textContent = '—';
+        unformattedValueSpan.textContent = '—';
+        isValidSpan.textContent = '—';
+    </script>
+</body>
+</html>

@@ -22,6 +22,12 @@ class TenantScopedViewSet(ModelViewSet):
 
     tenant_field = 'secretaria'
 
+    def get_permissions(self):
+        """Allow OPTIONS requests without authentication for CORS preflight."""
+        if self.request.method == 'OPTIONS':
+            return []
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user

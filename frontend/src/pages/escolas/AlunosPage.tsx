@@ -22,6 +22,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import type { Aluno, Escola, Turma } from '../../types';
+import { formatCPF, unformatCPF } from '../../utils/cpf';
 
 interface AlunoInput {
   turma: number;
@@ -55,7 +56,11 @@ export function AlunosPage() {
 
   useEffect(() => {
     if (editing) {
-      setForm({ turma: editing.turma, nome: editing.nome, cpf: editing.cpf });
+      setForm({ 
+        turma: editing.turma, 
+        nome: editing.nome, 
+        cpf: formatCPF(editing.cpf || '') 
+      });
     } else {
       setForm({ turma: turmas[0]?.id ?? 0, nome: '', cpf: '' });
     }
@@ -72,10 +77,16 @@ export function AlunosPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: AlunoInput) => {
+      // Remove a formatação do CPF antes de enviar
+      const payloadWithUnformattedCPF = {
+        ...payload,
+        cpf: unformatCPF(payload.cpf)
+      };
+      
       if (editing) {
-        await apiClient.put(`/escolas/alunos/${editing.id}/`, payload);
+        await apiClient.put(`/escolas/alunos/${editing.id}/`, payloadWithUnformattedCPF);
       } else {
-        await apiClient.post('/escolas/alunos/', payload);
+        await apiClient.post('/escolas/alunos/', payloadWithUnformattedCPF);
       }
     },
     onSuccess: () => {
@@ -142,7 +153,14 @@ export function AlunosPage() {
               <TextField
                 label="CPF"
                 value={form.cpf}
-                onChange={(event) => setForm((prev) => ({ ...prev, cpf: event.target.value }))}
+                onChange={(event) => {
+                  const formattedCPF = formatCPF(event.target.value);
+                  setForm((prev) => ({ ...prev, cpf: formattedCPF }));
+                }}
+                placeholder="000.000.000-00"
+                inputProps={{
+                  maxLength: 14 // XXX.XXX.XXX-XX
+                }}
                 fullWidth
               />
             </Grid>
@@ -201,7 +219,7 @@ export function AlunosPage() {
                     <TableRow key={aluno.id} hover>
                       <TableCell>{aluno.id}</TableCell>
                       <TableCell>{aluno.nome}</TableCell>
-                      <TableCell>{aluno.cpf || '—'}</TableCell>
+                      <TableCell>{aluno.cpf ? formatCPF(aluno.cpf) : '—'}</TableCell>
                       <TableCell>{turma?.nome ?? aluno.turma}</TableCell>
                       <TableCell>{turma?.escolaNome ?? '—'}</TableCell>
                       <TableCell align="right">
