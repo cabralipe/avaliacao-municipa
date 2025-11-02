@@ -150,6 +150,8 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
         'rest_framework.filters.SearchFilter',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.DefaultPagination',
+    'PAGE_SIZE': int(os.getenv('API_PAGE_SIZE', '20')),
 }
 
 SIMPLE_JWT = {

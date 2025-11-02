@@ -19,18 +19,22 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { ProvaAluno, Resposta } from '../../types';
+import type { PaginatedResponse, ProvaAluno, Resposta } from '../../types';
 
 async function fetchProvas(): Promise<ProvaAluno[]> {
-  const { data } = await apiClient.get<ProvaAluno[]>('/avaliacoes/provas/');
-  return data;
+  const { data } = await apiClient.get<ProvaAluno[] | PaginatedResponse<ProvaAluno>>(
+    '/avaliacoes/provas/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchRespostas(provaId: number): Promise<Resposta[]> {
-  const { data } = await apiClient.get<Resposta[]>(
-    `/respostas/respostas/?prova_aluno_id=${provaId}`
+  const { data } = await apiClient.get<Resposta[] | PaginatedResponse<Resposta>>(
+    '/respostas/respostas/',
+    { params: { prova_aluno_id: provaId, page_size: 0 } }
   );
-  return data;
+  return Array.isArray(data) ? data : data.results;
 }
 
 function parseAlternativas(texto: string): string[] {

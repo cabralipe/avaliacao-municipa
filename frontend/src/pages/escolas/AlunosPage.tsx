@@ -15,13 +15,15 @@ import {
   Typography
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import TablePagination from '@mui/material/TablePagination';
 import PersonAddRoundedIcon from '@mui/icons-material/PersonAddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { Aluno, Escola, Turma } from '../../types';
+import { usePaginatedResource } from '../../hooks/usePaginatedResource';
+import type { Aluno, Escola, PaginatedResponse, Turma } from '../../types';
 import { formatCPF, unformatCPF } from '../../utils/cpf';
 
 interface AlunoInput {
@@ -30,26 +32,37 @@ interface AlunoInput {
   cpf: string;
 }
 
-async function fetchAlunos(): Promise<Aluno[]> {
-  const { data } = await apiClient.get<Aluno[]>('/escolas/alunos/');
-  return data;
-}
-
 async function fetchTurmas(): Promise<Turma[]> {
-  const { data } = await apiClient.get<Turma[]>('/escolas/turmas/');
-  return data;
+  const { data } = await apiClient.get<Turma[] | PaginatedResponse<Turma>>('/escolas/turmas/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchEscolas(): Promise<Escola[]> {
-  const { data } = await apiClient.get<Escola[]>('/escolas/escolas/');
-  return data;
+  const { data } = await apiClient.get<Escola[] | PaginatedResponse<Escola>>('/escolas/escolas/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 export function AlunosPage() {
   const queryClient = useQueryClient();
-  const { data: alunos = [], isLoading } = useQuery({ queryKey: ['alunos'], queryFn: fetchAlunos });
   const { data: turmas = [] } = useQuery({ queryKey: ['turmas'], queryFn: fetchTurmas });
   const { data: escolas = [] } = useQuery({ queryKey: ['escolas'], queryFn: fetchEscolas });
+  const {
+    results: alunos,
+    total,
+    isLoading,
+    page,
+    pageSize,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = usePaginatedResource<Aluno>({
+    queryKey: ['alunos'],
+    url: '/escolas/alunos/',
+    initialPageSize: 10,
+  });
 
   const [form, setForm] = useState<AlunoInput>({ turma: 0, nome: '', cpf: '' });
   const [editing, setEditing] = useState<Aluno | null>(null);
@@ -246,6 +259,15 @@ export function AlunosPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handlePageChange}
+            rowsPerPage={pageSize}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+          />
         </Stack>
       </PageSection>
     </PageContainer>

@@ -34,6 +34,7 @@ import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
 import ChecklistRtlRoundedIcon from '@mui/icons-material/ChecklistRtlRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
 
 import { useAuth } from '../../hooks/useAuth';
 import type { Role } from '../../types';
@@ -116,6 +117,17 @@ const sections: NavSection[] = [
         to: '/relatorios/proficiencia-habilidade',
         icon: InsightsRoundedIcon,
         roles: ['admin']
+      }
+    ]
+  },
+  {
+    title: 'Administração',
+    items: [
+      {
+        label: 'Secretarias',
+        to: '/admin/secretarias',
+        icon: DomainAddRoundedIcon,
+        roles: ['superadmin']
       }
     ]
   }

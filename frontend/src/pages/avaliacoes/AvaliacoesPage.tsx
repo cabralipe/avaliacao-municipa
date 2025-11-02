@@ -19,13 +19,15 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import Grid from '@mui/material/Grid';
+import TablePagination from '@mui/material/TablePagination';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { Avaliacao, Turma } from '../../types';
+import { usePaginatedResource } from '../../hooks/usePaginatedResource';
+import type { Avaliacao, PaginatedResponse, Turma } from '../../types';
 
 interface AvaliacaoInput {
   titulo: string;
@@ -33,23 +35,29 @@ interface AvaliacaoInput {
   turmas: number[];
 }
 
-async function fetchAvaliacoes(): Promise<Avaliacao[]> {
-  const { data } = await apiClient.get<Avaliacao[]>('/avaliacoes/avaliacoes/');
-  return data;
-}
-
 async function fetchTurmas(): Promise<Turma[]> {
-  const { data } = await apiClient.get<Turma[]>('/escolas/turmas/');
-  return data;
+  const { data } = await apiClient.get<Turma[] | PaginatedResponse<Turma>>('/escolas/turmas/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 export function AvaliacoesPage() {
   const queryClient = useQueryClient();
-  const { data: avaliacoes = [], isLoading } = useQuery({
-    queryKey: ['avaliacoes'],
-    queryFn: fetchAvaliacoes
-  });
   const { data: turmas = [] } = useQuery({ queryKey: ['turmas'], queryFn: fetchTurmas });
+  const {
+    results: avaliacoes,
+    total,
+    isLoading,
+    page,
+    pageSize,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = usePaginatedResource<Avaliacao>({
+    queryKey: ['avaliacoes'],
+    url: '/avaliacoes/avaliacoes/',
+    initialPageSize: 10,
+  });
 
   const [form, setForm] = useState<AvaliacaoInput>({ titulo: '', data_aplicacao: '', turmas: [] });
   const [editing, setEditing] = useState<Avaliacao | null>(null);
@@ -241,6 +249,15 @@ export function AvaliacoesPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handlePageChange}
+            rowsPerPage={pageSize}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+          />
         </Stack>
       </PageSection>
     </PageContainer>

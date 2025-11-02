@@ -21,7 +21,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { Caderno, CadernoQuestao, Gabarito, Questao } from '../../types';
+import type { Caderno, CadernoQuestao, Gabarito, PaginatedResponse, Questao } from '../../types';
 
 interface GabaritoInput {
   caderno_questao: number;
@@ -33,18 +33,27 @@ interface CadernoDetail extends Caderno {
 }
 
 async function fetchGabaritos(): Promise<Gabarito[]> {
-  const { data } = await apiClient.get<Gabarito[]>('/respostas/gabaritos/');
-  return data;
+  const { data } = await apiClient.get<Gabarito[] | PaginatedResponse<Gabarito>>(
+    '/respostas/gabaritos/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchCadernos(): Promise<CadernoDetail[]> {
-  const { data } = await apiClient.get<CadernoDetail[]>('/avaliacoes/cadernos/');
-  return data;
+  const { data } = await apiClient.get<CadernoDetail[] | PaginatedResponse<CadernoDetail>>(
+    '/avaliacoes/cadernos/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchQuestoes(): Promise<Questao[]> {
-  const { data } = await apiClient.get<Questao[]>('/itens/questoes/');
-  return data;
+  const { data } = await apiClient.get<Questao[] | PaginatedResponse<Questao>>(
+    '/itens/questoes/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 export function GabaritosPage() {

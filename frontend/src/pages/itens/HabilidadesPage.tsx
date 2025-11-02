@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   IconButton,
@@ -14,6 +14,7 @@ import {
   Typography
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import TablePagination from '@mui/material/TablePagination';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
@@ -21,6 +22,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import { useAuth } from '../../hooks/useAuth';
+import { usePaginatedResource } from '../../hooks/usePaginatedResource';
 import type { Habilidade } from '../../types';
 
 interface HabilidadeInput {
@@ -28,16 +30,20 @@ interface HabilidadeInput {
   descricao: string;
 }
 
-async function fetchHabilidades(): Promise<Habilidade[]> {
-  const { data } = await apiClient.get<Habilidade[]>('/itens/habilidades/');
-  return data;
-}
-
 export function HabilidadesPage() {
   const queryClient = useQueryClient();
-  const { data: habilidades = [], isLoading } = useQuery({
+  const {
+    results: habilidades,
+    total,
+    isLoading,
+    page,
+    pageSize,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = usePaginatedResource<Habilidade>({
     queryKey: ['habilidades'],
-    queryFn: fetchHabilidades
+    url: '/itens/habilidades/',
+    initialPageSize: 10,
   });
 
   const [form, setForm] = useState<HabilidadeInput>({ codigo: '', descricao: '' });
@@ -201,6 +207,15 @@ export function HabilidadesPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handlePageChange}
+            rowsPerPage={pageSize}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+          />
         </Stack>
       </PageSection>
     </PageContainer>

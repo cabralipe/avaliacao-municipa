@@ -15,13 +15,15 @@ import {
   Typography
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import TablePagination from '@mui/material/TablePagination';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { Escola, Turma } from '../../types';
+import { usePaginatedResource } from '../../hooks/usePaginatedResource';
+import type { Escola, PaginatedResponse, Turma } from '../../types';
 
 interface TurmaInput {
   escola: number;
@@ -29,20 +31,29 @@ interface TurmaInput {
   ano: string;
 }
 
-async function fetchTurmas(): Promise<Turma[]> {
-  const { data } = await apiClient.get<Turma[]>('/escolas/turmas/');
-  return data;
-}
-
 async function fetchEscolas(): Promise<Escola[]> {
-  const { data } = await apiClient.get<Escola[]>('/escolas/escolas/');
-  return data;
+  const { data } = await apiClient.get<Escola[] | PaginatedResponse<Escola>>('/escolas/escolas/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 export function TurmasPage() {
   const queryClient = useQueryClient();
-  const { data: turmas = [], isLoading } = useQuery({ queryKey: ['turmas'], queryFn: fetchTurmas });
   const { data: escolas = [] } = useQuery({ queryKey: ['escolas'], queryFn: fetchEscolas });
+  const {
+    results: turmas,
+    total,
+    isLoading,
+    page,
+    pageSize,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = usePaginatedResource<Turma>({
+    queryKey: ['turmas'],
+    url: '/escolas/turmas/',
+    initialPageSize: 10,
+  });
 
   const [form, setForm] = useState<TurmaInput>({ escola: 0, nome: '', ano: '' });
   const [editing, setEditing] = useState<Turma | null>(null);
@@ -211,6 +222,15 @@ export function TurmasPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handlePageChange}
+            rowsPerPage={pageSize}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+          />
         </Stack>
       </PageSection>
     </PageContainer>

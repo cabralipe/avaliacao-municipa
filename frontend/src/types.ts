@@ -15,6 +15,13 @@ export interface User {
   secretaria: Secretaria | null;
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export interface Escola {
   id: number;
   secretaria: number;

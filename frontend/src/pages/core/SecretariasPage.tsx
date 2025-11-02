@@ -15,122 +15,108 @@ import {
 } from '@mui/material';
 import TablePagination from '@mui/material/TablePagination';
 import Grid from '@mui/material/Grid';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
-
-import { formatINEP, unformatINEP } from '../../utils/inep';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import { usePaginatedResource } from '../../hooks/usePaginatedResource';
-import type { Escola } from '../../types';
+import type { Secretaria } from '../../types';
 
-interface EscolaInput {
+interface SecretariaInput {
   nome: string;
-  codigo_inep: string;
+  cnpj: string;
+  cidade: string;
 }
 
-export function EscolasPage() {
+export function SecretariasPage() {
   const queryClient = useQueryClient();
   const {
-    results: escolas,
+    results: secretarias,
     total,
     isLoading,
     page,
     pageSize,
     handlePageChange,
     handleRowsPerPageChange,
-  } = usePaginatedResource<Escola>({
-    queryKey: ['escolas'],
-    url: '/escolas/escolas/',
+  } = usePaginatedResource<Secretaria>({
+    queryKey: ['secretarias'],
+    url: '/core/secretarias/',
     initialPageSize: 10,
   });
 
-  const [form, setForm] = useState<EscolaInput>({ nome: '', codigo_inep: '' });
-  const [editing, setEditing] = useState<Escola | null>(null);
+  const [form, setForm] = useState<SecretariaInput>({ nome: '', cnpj: '', cidade: '' });
+  const [editing, setEditing] = useState<Secretaria | null>(null);
 
   useEffect(() => {
     if (editing) {
-      setForm({
-        nome: editing.nome,
-        codigo_inep: formatINEP(editing.codigo_inep || ''),
-      });
+      setForm({ nome: editing.nome, cnpj: editing.cnpj ?? '', cidade: editing.cidade ?? '' });
     } else {
-      setForm({ nome: '', codigo_inep: '' });
+      setForm({ nome: '', cnpj: '', cidade: '' });
     }
   }, [editing]);
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: EscolaInput) => {
-      // Remove formatação do código INEP antes de enviar
-      const payloadWithUnformattedINEP = {
-        ...payload,
-        codigo_inep: unformatINEP(payload.codigo_inep)
-      };
-      
+    mutationFn: async (payload: SecretariaInput) => {
       if (editing) {
-        await apiClient.put(`/escolas/escolas/${editing.id}/`, payloadWithUnformattedINEP);
+        await apiClient.put(`/core/secretarias/${editing.id}/`, payload);
       } else {
-        await apiClient.post('/escolas/escolas/', payloadWithUnformattedINEP);
+        await apiClient.post('/core/secretarias/', payload);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escolas'] });
+      queryClient.invalidateQueries({ queryKey: ['secretarias'] });
       setEditing(null);
-      setForm({ nome: '', codigo_inep: '' });
+      setForm({ nome: '', cnpj: '', cidade: '' });
     }
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => apiClient.delete(`/escolas/escolas/${id}/`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['escolas'] })
+    mutationFn: async (id: number) => apiClient.delete(`/core/secretarias/${id}/`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['secretarias'] })
   });
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     saveMutation.mutate(form);
   };
 
-  const actionLabel = editing ? 'Atualizar escola' : 'Cadastrar escola';
+  const actionLabel = editing ? 'Atualizar secretaria' : 'Cadastrar secretaria';
 
   return (
     <PageContainer>
       <PageHeader
-        title="Escolas"
-        description="Cadastre e gerencie as escolas vinculadas à secretaria."
+        title="Secretarias"
+        description="Gerencie as secretarias habilitadas na plataforma."
       />
 
       <PageSection>
-        <Stack
-          component="form"
-          spacing={{ xs: 2, md: 3 }}
-          onSubmit={onSubmit}
-        >
+        <Stack component="form" spacing={{ xs: 2, md: 3 }} onSubmit={handleSubmit}>
           <Grid container spacing={{ xs: 2, md: 3 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField
-                label="Nome da escola"
+                label="Nome"
                 value={form.nome}
                 onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
                 required
                 fullWidth
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField
-                label="Código INEP"
-                value={form.codigo_inep}
-                onChange={(event) => {
-                  const formattedValue = formatINEP(event.target.value);
-                  setForm((prev) => ({ ...prev, codigo_inep: formattedValue }));
-                }}
-                placeholder="12345678"
-                inputProps={{
-                  maxLength: 8,
-                  inputMode: 'numeric',
-                  pattern: '[0-9]*'
-                }}
+                label="CNPJ"
+                value={form.cnpj}
+                onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))}
+                placeholder="00.000.000/0000-00"
+                fullWidth
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                label="Cidade"
+                value={form.cidade}
+                onChange={(event) => setForm((prev) => ({ ...prev, cidade: event.target.value }))}
                 fullWidth
               />
             </Grid>
@@ -144,7 +130,7 @@ export function EscolasPage() {
             <Button
               type="submit"
               variant="contained"
-              startIcon={<AddRoundedIcon />}
+              startIcon={<DomainAddRoundedIcon />}
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? 'Salvando...' : actionLabel}
@@ -155,50 +141,52 @@ export function EscolasPage() {
 
       <PageSection>
         <Stack spacing={2}>
-          <Typography variant="h6">Lista de escolas</Typography>
+          <Typography variant="h6">Secretarias cadastradas</Typography>
           <TableContainer>
             <Table size="medium">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Nome</TableCell>
-                  <TableCell>Código INEP</TableCell>
+                  <TableCell>CNPJ</TableCell>
+                  <TableCell>Cidade</TableCell>
                   <TableCell align="right">Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={5} align="center">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 )}
-                {!isLoading && escolas.length === 0 && (
+                {!isLoading && secretarias.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      Nenhuma escola cadastrada.
+                    <TableCell colSpan={5} align="center">
+                      Nenhuma secretaria cadastrada.
                     </TableCell>
                   </TableRow>
                 )}
-                {escolas.map((escola) => (
-                  <TableRow key={escola.id} hover>
-                    <TableCell>{escola.id}</TableCell>
-                    <TableCell>{escola.nome}</TableCell>
-                    <TableCell>{escola.codigo_inep || '—'}</TableCell>
+                {secretarias.map((secretaria) => (
+                  <TableRow key={secretaria.id} hover>
+                    <TableCell>{secretaria.id}</TableCell>
+                    <TableCell>{secretaria.nome}</TableCell>
+                    <TableCell>{secretaria.cnpj || '—'}</TableCell>
+                    <TableCell>{secretaria.cidade || '—'}</TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                         <IconButton
                           color="primary"
-                          onClick={() => setEditing(escola)}
-                          aria-label={`Editar ${escola.nome}`}
+                          onClick={() => setEditing(secretaria)}
+                          aria-label={`Editar ${secretaria.nome}`}
                         >
                           <EditRoundedIcon />
                         </IconButton>
                         <IconButton
                           color="error"
-                          onClick={() => deleteMutation.mutate(escola.id)}
-                          aria-label={`Excluir ${escola.nome}`}
+                          onClick={() => deleteMutation.mutate(secretaria.id)}
+                          aria-label={`Excluir ${secretaria.nome}`}
                         >
                           <DeleteRoundedIcon />
                         </IconButton>

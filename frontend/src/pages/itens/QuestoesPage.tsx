@@ -16,6 +16,7 @@ import {
   Typography
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import TablePagination from '@mui/material/TablePagination';
 import PostAddRoundedIcon from '@mui/icons-material/PostAddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
@@ -23,7 +24,8 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import { useAuth } from '../../hooks/useAuth';
-import type { Competencia, Habilidade, Questao } from '../../types';
+import { usePaginatedResource } from '../../hooks/usePaginatedResource';
+import type { Competencia, Habilidade, PaginatedResponse, Questao } from '../../types';
 
 interface QuestaoInput {
   enunciado: string;
@@ -38,19 +40,18 @@ interface QuestaoInput {
   status: 'pendente' | 'aprovada';
 }
 
-async function fetchQuestoes(): Promise<Questao[]> {
-  const { data } = await apiClient.get<Questao[]>('/itens/questoes/');
-  return data;
-}
-
 async function fetchCompetencias(): Promise<Competencia[]> {
-  const { data } = await apiClient.get<Competencia[]>('/itens/competencias/');
-  return data;
+  const { data } = await apiClient.get<Competencia[] | PaginatedResponse<Competencia>>('/itens/competencias/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchHabilidades(): Promise<Habilidade[]> {
-  const { data } = await apiClient.get<Habilidade[]>('/itens/habilidades/');
-  return data;
+  const { data } = await apiClient.get<Habilidade[] | PaginatedResponse<Habilidade>>('/itens/habilidades/', {
+    params: { page_size: 0 },
+  });
+  return Array.isArray(data) ? data : data.results;
 }
 
 const initialState: QuestaoInput = {
@@ -68,9 +69,18 @@ const initialState: QuestaoInput = {
 
 export function QuestoesPage() {
   const queryClient = useQueryClient();
-  const { data: questoes = [], isLoading } = useQuery({
+  const {
+    results: questoes,
+    total,
+    isLoading,
+    page,
+    pageSize,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = usePaginatedResource<Questao>({
     queryKey: ['questoes'],
-    queryFn: fetchQuestoes
+    url: '/itens/questoes/',
+    initialPageSize: 10,
   });
   const { data: competencias = [] } = useQuery({
     queryKey: ['competencias'],
@@ -379,6 +389,15 @@ export function QuestoesPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handlePageChange}
+            rowsPerPage={pageSize}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+          />
         </Stack>
       </PageSection>
     </PageContainer>

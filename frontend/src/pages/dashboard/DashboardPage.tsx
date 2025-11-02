@@ -15,21 +15,8 @@ interface Summary {
 }
 
 async function fetchSummary(): Promise<Summary> {
-  const [escolas, turmas, alunos, questoes, avaliacoes] = await Promise.all([
-    apiClient.get('/escolas/escolas/'),
-    apiClient.get('/escolas/turmas/'),
-    apiClient.get('/escolas/alunos/'),
-    apiClient.get('/itens/questoes/'),
-    apiClient.get('/avaliacoes/avaliacoes/')
-  ]);
-
-  return {
-    escolas: escolas.data.length ?? 0,
-    turmas: turmas.data.length ?? 0,
-    alunos: alunos.data.length ?? 0,
-    questoes: questoes.data.length ?? 0,
-    avaliacoes: avaliacoes.data.length ?? 0
-  };
+  const { data } = await apiClient.get<Summary>('/core/dashboard/summary/');
+  return data;
 }
 
 export function DashboardPage() {

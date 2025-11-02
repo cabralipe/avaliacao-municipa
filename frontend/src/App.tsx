@@ -18,6 +18,7 @@ import { ProvasPage } from './pages/avaliacoes/ProvasPage';
 import { RespostasPage } from './pages/respostas/RespostasPage';
 import { GabaritosPage } from './pages/respostas/GabaritosPage';
 import { ProfHabilidadePage } from './pages/relatorios/ProfHabilidadePage';
+import { SecretariasPage } from './pages/core/SecretariasPage';
 
 export default function App() {
   const { loading } = useAuth();
@@ -138,6 +139,14 @@ export default function App() {
           element={
             <RequireRole allowed={['admin']}>
               <ProfHabilidadePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="admin/secretarias"
+          element={
+            <RequireRole allowed={['superadmin']}>
+              <SecretariasPage />
             </RequireRole>
           }
         />

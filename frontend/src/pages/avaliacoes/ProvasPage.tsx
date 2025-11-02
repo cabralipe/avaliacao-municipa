@@ -22,7 +22,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import type { Aluno, Avaliacao, Caderno, ProvaAluno } from '../../types';
+import type { Aluno, Avaliacao, Caderno, PaginatedResponse, ProvaAluno } from '../../types';
 
 interface ProvaInput {
   avaliacao: number;
@@ -31,23 +31,35 @@ interface ProvaInput {
 }
 
 async function fetchProvas(): Promise<ProvaAluno[]> {
-  const { data } = await apiClient.get<ProvaAluno[]>('/avaliacoes/provas/');
-  return data;
+  const { data } = await apiClient.get<ProvaAluno[] | PaginatedResponse<ProvaAluno>>(
+    '/avaliacoes/provas/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchAvaliacoes(): Promise<Avaliacao[]> {
-  const { data } = await apiClient.get<Avaliacao[]>('/avaliacoes/avaliacoes/');
-  return data;
+  const { data } = await apiClient.get<Avaliacao[] | PaginatedResponse<Avaliacao>>(
+    '/avaliacoes/avaliacoes/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchAlunos(): Promise<Aluno[]> {
-  const { data } = await apiClient.get<Aluno[]>('/escolas/alunos/');
-  return data;
+  const { data } = await apiClient.get<Aluno[] | PaginatedResponse<Aluno>>(
+    '/escolas/alunos/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 async function fetchCadernos(): Promise<Caderno[]> {
-  const { data } = await apiClient.get<Caderno[]>('/avaliacoes/cadernos/');
-  return data;
+  const { data } = await apiClient.get<Caderno[] | PaginatedResponse<Caderno>>(
+    '/avaliacoes/cadernos/',
+    { params: { page_size: 0 } }
+  );
+  return Array.isArray(data) ? data : data.results;
 }
 
 export function ProvasPage() {
