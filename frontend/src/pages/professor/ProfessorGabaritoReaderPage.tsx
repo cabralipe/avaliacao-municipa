@@ -34,6 +34,7 @@ import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { apiClient } from '../../api/client';
 import { QrScannerDialog } from '../../components/QrScannerDialog';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
+import { loadOpenCv } from '../../utils/opencv';
 import type {
   Avaliacao,
   Caderno,
@@ -67,9 +68,17 @@ interface QuestionAnalysis {
   detected: string | null;
 }
 
+interface AnalysisStats {
+  mean: number;
+  stddev: number;
+  threshold: number;
+  samples: number;
+}
+
 interface AnalyzeResult {
   area: NormalizedRect;
   results: QuestionAnalysis[];
+  stats: AnalysisStats;
 }
 
 const DEFAULT_MANUAL_AREA: ManualAreaParams = {
@@ -83,6 +92,28 @@ const MIN_THRESHOLD = 5;
 const MAX_THRESHOLD = 95;
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
+const GRID_COLUMNS_MM = [20, 16, 16, 16, 16, 16];
+const GRID_PADDING_MM = { top: 18, bottom: 18, left: 22, right: 22 } as const;
+const ROW_HEIGHT_MM = 12;
+const MARKER_SIZE_MM = 14;
+const MARKER_OFFSET_FROM_GRID_MM = 12 - MARKER_SIZE_MM / 2; // 5 mm entre centro do marcador e borda
+const PX_PER_MM = 10;
+
+const GRID_INNER_WIDTH_MM = GRID_COLUMNS_MM.reduce((acc, value) => acc + value, 0);
+const TOTAL_WIDTH_MM = GRID_INNER_WIDTH_MM + GRID_PADDING_MM.left + GRID_PADDING_MM.right;
+
+const computeTotalHeightMm = (rows: number) =>
+  GRID_PADDING_MM.top + GRID_PADDING_MM.bottom + ROW_HEIGHT_MM * rows;
+
+const computeNormalizedGridArea = (rows: number): NormalizedRect => {
+  const totalHeightMm = computeTotalHeightMm(rows);
+  return {
+    top: GRID_PADDING_MM.top / totalHeightMm,
+    left: GRID_PADDING_MM.left / TOTAL_WIDTH_MM,
+    width: GRID_INNER_WIDTH_MM / TOTAL_WIDTH_MM,
+    height: (ROW_HEIGHT_MM * rows) / totalHeightMm
+  };
+};
 
 function clamp01(value: number) {
   if (Number.isNaN(value)) {
@@ -189,6 +220,163 @@ function detectAnswerGridBounds(
   };
 }
 
+async function attemptPerspectiveNormalization(
+  baseCanvas: HTMLCanvasElement,
+  rows: number
+): Promise<{ canvas: HTMLCanvasElement; normalizedArea: NormalizedRect } | null> {
+  try {
+    const cv = await loadOpenCv();
+    const src = cv.imread(baseCanvas);
+    const gray = new cv.Mat();
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+    const blur = new cv.Mat();
+    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    const binary = new cv.Mat();
+    cv.adaptiveThreshold(
+      blur,
+      binary,
+      255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY_INV,
+      35,
+      12
+    );
+    const contours = new cv.MatVector();
+    const hierarchy = new cv.Mat();
+    cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    type MarkerCandidate = {
+      center: { x: number; y: number };
+      size: number;
+    };
+    const markers: MarkerCandidate[] = [];
+
+    for (let i = 0; i < contours.size(); i += 1) {
+      const contour = contours.get(i);
+      const peri = cv.arcLength(contour, true);
+      const approx = new cv.Mat();
+      cv.approxPolyDP(contour, approx, 0.02 * peri, true);
+      if (approx.rows === 4 && cv.isContourConvex(approx)) {
+        const area = cv.contourArea(approx);
+        if (area < (src.cols * src.rows) * 0.005) {
+          approx.delete();
+          contour.delete();
+          continue;
+        }
+        const rect = cv.boundingRect(approx);
+        const aspect = rect.width / rect.height;
+        if (aspect < 0.75 || aspect > 1.25) {
+          approx.delete();
+          contour.delete();
+          continue;
+        }
+        const moments = cv.moments(approx);
+        if (moments.m00 === 0) {
+          approx.delete();
+          contour.delete();
+          continue;
+        }
+        const center = {
+          x: moments.m10 / moments.m00,
+          y: moments.m01 / moments.m00
+        };
+        markers.push({ center, size: (rect.width + rect.height) / 2 });
+        approx.delete();
+      } else {
+        approx.delete();
+      }
+      contour.delete();
+    }
+
+    contours.delete();
+    hierarchy.delete();
+    binary.delete();
+    blur.delete();
+    gray.delete();
+
+    if (markers.length < 4) {
+      src.delete();
+      return null;
+    }
+
+    const orderedMarkers = markers
+      .sort((a, b) => b.size - a.size)
+      .slice(0, 4)
+      .sort((a, b) => a.center.y - b.center.y);
+
+    const topPair = orderedMarkers.slice(0, 2).sort((a, b) => a.center.x - b.center.x);
+    const bottomPair = orderedMarkers.slice(2, 4).sort((a, b) => a.center.x - b.center.x);
+    const arranged = [topPair[0], topPair[1], bottomPair[0], bottomPair[1]];
+
+    const avgMarkerSize = arranged.reduce((acc, marker) => acc + marker.size, 0) / arranged.length;
+    const pxPerMm = avgMarkerSize / MARKER_SIZE_MM;
+    const offsetPx = pxPerMm * MARKER_OFFSET_FROM_GRID_MM;
+
+    const srcPoints = [
+      { x: arranged[0].center.x + offsetPx, y: arranged[0].center.y + offsetPx },
+      { x: arranged[1].center.x - offsetPx, y: arranged[1].center.y + offsetPx },
+      { x: arranged[2].center.x + offsetPx, y: arranged[2].center.y - offsetPx },
+      { x: arranged[3].center.x - offsetPx, y: arranged[3].center.y - offsetPx }
+    ];
+
+    const totalHeightMm = computeTotalHeightMm(rows);
+    const destWidth = Math.round(TOTAL_WIDTH_MM * PX_PER_MM);
+    const destHeight = Math.round(totalHeightMm * PX_PER_MM);
+
+    const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      srcPoints[0].x,
+      srcPoints[0].y,
+      srcPoints[1].x,
+      srcPoints[1].y,
+      srcPoints[2].x,
+      srcPoints[2].y,
+      srcPoints[3].x,
+      srcPoints[3].y
+    ]);
+    const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      0,
+      0,
+      destWidth,
+      0,
+      0,
+      destHeight,
+      destWidth,
+      destHeight
+    ]);
+
+    const transform = cv.getPerspectiveTransform(srcTri, dstTri);
+    const warped = new cv.Mat();
+    cv.warpPerspective(
+      src,
+      warped,
+      transform,
+      new cv.Size(destWidth, destHeight),
+      cv.INTER_LINEAR,
+      cv.BORDER_CONSTANT,
+      new cv.Scalar(255, 255, 255, 255)
+    );
+
+    const warpCanvas = document.createElement('canvas');
+    warpCanvas.width = destWidth;
+    warpCanvas.height = destHeight;
+    cv.imshow(warpCanvas, warped);
+
+    warped.delete();
+    transform.delete();
+    srcTri.delete();
+    dstTri.delete();
+    src.delete();
+
+    return {
+      canvas: warpCanvas,
+      normalizedArea: computeNormalizedGridArea(rows)
+    };
+  } catch (error) {
+    console.error('Perspective normalization failed', error);
+    return null;
+  }
+}
+
 async function analyzeGabaritoImage(
   imageSrc: string,
   questoes: CadernoQuestao[],
@@ -197,7 +385,8 @@ async function analyzeGabaritoImage(
   if (!questoes.length) {
     return {
       area: manualToNormalized(DEFAULT_MANUAL_AREA),
-      results: []
+      results: [],
+      stats: { mean: 0, stddev: 0, threshold: clamp01(options.threshold), samples: 0 }
     };
   }
 
@@ -208,30 +397,48 @@ async function analyzeGabaritoImage(
     img.src = imageSrc;
   });
 
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
+  const baseCanvas = document.createElement('canvas');
+  baseCanvas.width = image.width;
+  baseCanvas.height = image.height;
+  const baseCtx = baseCanvas.getContext('2d');
+  if (!baseCtx) {
     throw new Error('Canvas não suportado.');
   }
-  ctx.drawImage(image, 0, 0);
+  baseCtx.drawImage(image, 0, 0);
 
-  const detectedArea = options.area ?? detectAnswerGridBounds(ctx, canvas.width, canvas.height);
-  const normalizedArea = fetchNormalized(detectedArea);
+  let normalizedArea: NormalizedRect | null = options.area ?? null;
+  if (!normalizedArea) {
+    const detectedArea = detectAnswerGridBounds(baseCtx, baseCanvas.width, baseCanvas.height);
+    normalizedArea = fetchNormalized(detectedArea);
+  }
 
-  const areaX = Math.floor(normalizedArea.left * canvas.width);
-  const areaY = Math.floor(normalizedArea.top * canvas.height);
-  const areaWidth = Math.floor(normalizedArea.width * canvas.width);
-  const areaHeight = Math.floor(normalizedArea.height * canvas.height);
+  let workingCanvas: HTMLCanvasElement = baseCanvas;
+  let workingArea: NormalizedRect = normalizedArea;
+
+  const warpResult = await attemptPerspectiveNormalization(baseCanvas, questoes.length);
+  if (warpResult) {
+    workingCanvas = warpResult.canvas;
+    workingArea = warpResult.normalizedArea;
+  }
+
+  const workingCtx = workingCanvas.getContext('2d');
+  if (!workingCtx) {
+    throw new Error('Canvas não suportado.');
+  }
+
+  const areaX = Math.floor(workingArea.left * workingCanvas.width);
+  const areaY = Math.floor(workingArea.top * workingCanvas.height);
+  const areaWidth = Math.floor(workingArea.width * workingCanvas.width);
+  const areaHeight = Math.floor(workingArea.height * workingCanvas.height);
 
   const rows = questoes.length;
   const columns = LETTERS.length;
   const rowHeight = areaHeight / rows;
   const columnWidth = areaWidth / columns;
 
-  const results: QuestionAnalysis[] = [];
-  const effectiveThreshold = clamp01(options.threshold);
+  type DraftResult = { ordem: number; scores: CellScore[] };
+  const draftResults: DraftResult[] = [];
+  const allDarkness: number[] = [];
 
   for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
     const questionNumber = questoes[rowIndex].ordem;
@@ -245,40 +452,87 @@ async function analyzeGabaritoImage(
       const marginY = rowHeight * 0.2;
       const sampleX = Math.floor(cellX + marginX);
       const sampleY = Math.floor(cellY + marginY);
-      const sampleWidth = Math.max(2, Math.floor(columnWidth - marginX * 2));
-      const sampleHeight = Math.max(2, Math.floor(rowHeight - marginY * 2));
+      const sampleWidth = Math.max(4, Math.floor(columnWidth - marginX * 2));
+      const sampleHeight = Math.max(4, Math.floor(rowHeight - marginY * 2));
 
-      const imageData = ctx.getImageData(sampleX, sampleY, sampleWidth, sampleHeight);
+      const imageData = workingCtx.getImageData(sampleX, sampleY, sampleWidth, sampleHeight);
       const { data } = imageData;
-      let darknessSum = 0;
+      const values: number[] = [];
+      let sum = 0;
 
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        darknessSum += 1 - brightness;
+      const stepX = Math.max(1, Math.floor(sampleWidth / 12));
+      const stepY = Math.max(1, Math.floor(sampleHeight / 12));
+
+      for (let sy = 0; sy < sampleHeight; sy += stepY) {
+        for (let sx = 0; sx < sampleWidth; sx += stepX) {
+          const px = (sy * sampleWidth + sx) * 4;
+          const r = data[px];
+          const g = data[px + 1];
+          const b = data[px + 2];
+          const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          const darkness = 1 - brightness;
+          values.push(darkness);
+          sum += darkness;
+        }
       }
 
-      const sampleCount = data.length / 4;
-      const avgDarkness = sampleCount ? darknessSum / sampleCount : 0;
-      scores.push({ letter: LETTERS[colIndex], darkness: avgDarkness });
+      const avg = values.length ? sum / values.length : 0;
+      const median = values.length
+        ? values
+            .slice()
+            .sort((a, b) => a - b)[Math.floor(values.length / 2)]
+        : 0;
+      const combined = avg * 0.6 + median * 0.4;
+      scores.push({ letter: LETTERS[colIndex], darkness: combined });
+      allDarkness.push(combined);
     }
 
-    const best = scores.reduce(
-      (acc, current) => (current.darkness > acc.darkness ? current : acc),
-      { letter: '', darkness: 0 }
-    );
-    const detected = best.darkness >= effectiveThreshold ? best.letter : null;
-
-    results.push({
-      ordem: questionNumber,
-      scores,
-      detected
-    });
+    draftResults.push({ ordem: questionNumber, scores });
   }
 
-  return { area: normalizedArea, results };
+  const samples = allDarkness.length;
+  const mean = samples
+    ? allDarkness.reduce((acc, value) => acc + value, 0) / samples
+    : 0;
+  const variance = samples
+    ? allDarkness.reduce((acc, value) => acc + (value - mean) ** 2, 0) / samples
+    : 0;
+  const stddev = Math.sqrt(variance);
+
+  const sliderThreshold = clamp01(options.threshold);
+  const dynamicThreshold = clamp01(mean + stddev * 0.75);
+  const fallbackThreshold = clamp01(mean + 0.12);
+  const baseThreshold = Math.max(sliderThreshold, dynamicThreshold, fallbackThreshold);
+
+  const results = draftResults.map<QuestionAnalysis>((row) => {
+    const sorted = row.scores.slice().sort((a, b) => b.darkness - a.darkness);
+    const top = sorted[0] ?? { letter: '', darkness: 0 };
+    const runnerUp = sorted[1] ?? { letter: '', darkness: 0 };
+    const rowMean = row.scores.reduce((acc, score) => acc + score.darkness, 0) / row.scores.length;
+    const rowVariance = row.scores.reduce((acc, score) => acc + (score.darkness - rowMean) ** 2, 0) / row.scores.length;
+    const rowStd = Math.sqrt(rowVariance);
+    const rowThreshold = clamp01(Math.max(baseThreshold, rowMean + rowStd * 0.5));
+    const gap = top.darkness - runnerUp.darkness;
+    const minimalGap = Math.max(0.045, stddev * 0.25);
+    const detected = top.darkness >= rowThreshold && gap >= minimalGap ? top.letter : null;
+
+    return {
+      ordem: row.ordem,
+      scores: row.scores,
+      detected
+    };
+  });
+
+  return {
+    area: workingArea,
+    results,
+    stats: {
+      mean,
+      stddev,
+      threshold: baseThreshold,
+      samples
+    }
+  };
 }
 
 function parseProvaId(rawValue: string): number | null {
@@ -334,6 +588,7 @@ export function ProfessorGabaritoReaderPage() {
   const [analysis, setAnalysis] = useState<QuestionAnalysis[]>([]);
   const [manualAdjustments, setManualAdjustments] = useState<Record<number, string>>({});
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisStats, setAnalysisStats] = useState<AnalysisStats | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [provaId, setProvaId] = useState<number | null>(null);
   const [provaInfo, setProvaInfo] = useState<ProvaAluno | null>(null);
@@ -352,6 +607,8 @@ export function ProfessorGabaritoReaderPage() {
     }
     return `Aluno ${provaInfo.aluno}`;
   }, [provaInfo]);
+
+  const formatScore = (value: number) => `${(value * 100).toFixed(1)}%`;
 
   useEffect(() => {
     if (!cameraActive) {
@@ -401,6 +658,7 @@ export function ProfessorGabaritoReaderPage() {
     setProvaId(null);
     setProvaInfo(null);
     setAnalysisError(null);
+    setAnalysisStats(null);
     setAnswerArea(useAutoArea ? answerArea : manualToNormalized(manualArea));
   };
 
@@ -501,12 +759,14 @@ export function ProfessorGabaritoReaderPage() {
       });
       setAnswerArea(result.area);
       setAnalysis(result.results);
+      setAnalysisStats(result.stats);
       setFeedback(
         `Leitura concluída. Foram detectadas ${result.results.filter((item) => item.detected).length} respostas.`
       );
     } catch (err) {
       console.error(err);
       setAnalysisError('Falha ao processar a imagem. Ajuste os marcadores ou capture novamente.');
+      setAnalysisStats(null);
     }
   };
 
@@ -931,6 +1191,12 @@ export function ProfessorGabaritoReaderPage() {
             <Typography variant="body2" color="text.secondary">
               Total de questões: {totalQuestoes}. Respostas identificadas: {finalAnswers.filter((item) => item).length}.
             </Typography>
+            {analysisStats && (
+              <Typography variant="body2" color="text.secondary">
+                Estatísticas: média global {formatScore(analysisStats.mean)}, desvio padrão {formatScore(analysisStats.stddev)},
+                limiar aplicado {formatScore(analysisStats.threshold)} (amostras {analysisStats.samples}).
+              </Typography>
+            )}
           </Stack>
         </PageSection>
       )}

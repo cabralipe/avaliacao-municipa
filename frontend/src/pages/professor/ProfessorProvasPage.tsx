@@ -41,6 +41,14 @@ interface GabaritoResponse {
     questao: number;
     alternativa_correta: string | null;
   }>;
+  layout?: {
+    rows: number;
+    columns: number;
+    marker_size_mm?: number;
+    marker_margin_mm?: number;
+    grid_padding_mm?: number;
+    notes?: string;
+  };
 }
 
 type AlertState = { type: 'error' | 'success' | 'info'; message: string } | null;

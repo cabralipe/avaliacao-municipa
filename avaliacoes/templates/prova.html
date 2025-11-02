@@ -154,12 +154,13 @@
 
       .answer-grid {
         position: relative;
-        margin-top: 12px;
-        padding: 16px 18px;
-        border: 2px solid #111;
-        border-radius: 6px;
+        margin-top: 14px;
+        padding: 18px 22px;
+        border: 3px solid #111;
+        border-radius: 8px;
         background-color: #fff;
         overflow: visible;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
       }
 
       .answer-grid table {
@@ -168,6 +169,7 @@
         margin: 0;
         position: relative;
         z-index: 1;
+        table-layout: fixed;
       }
 
       .answer-grid th,
@@ -181,28 +183,31 @@
         background-color: #f0f0f0;
         font-size: 12px;
         text-transform: uppercase;
+        letter-spacing: 1px;
       }
 
       .answer-grid td {
-        height: 22px;
+        height: 24px;
       }
 
       .answer-grid .question-cell {
         font-weight: 600;
-        width: 12%;
+        width: 20mm;
+        background-color: rgba(0, 0, 0, 0.03);
       }
 
       .answer-grid .option-cell {
-        width: 17.6%;
+        width: 16mm;
         position: relative;
       }
 
       .answer-grid .mark-box {
         display: inline-block;
-        width: 14px;
-        height: 14px;
-        border: 1px solid #111;
+        width: 16px;
+        height: 16px;
+        border: 1.2px solid #111;
         border-radius: 2px;
+        background-color: #fff;
       }
 
       .answer-grid .marker {
@@ -235,6 +240,29 @@
         right: -12mm;
       }
 
+      .answer-grid .marker::after,
+      .answer-grid .marker::before {
+        content: '';
+        position: absolute;
+        background-color: #fff;
+      }
+
+      .answer-grid .marker::after {
+        top: 50%;
+        left: 25%;
+        right: 25%;
+        height: 1.8mm;
+        transform: translateY(-50%);
+      }
+
+      .answer-grid .marker::before {
+        left: 50%;
+        top: 25%;
+        bottom: 25%;
+        width: 1.8mm;
+        transform: translateX(-50%);
+      }
+
       .answer-grid::before,
       .answer-grid::after {
         content: '';
@@ -247,10 +275,39 @@
 
       .answer-grid::before {
         top: 25%;
+        border-top-style: solid;
+        opacity: 0.25;
       }
 
       .answer-grid::after {
         top: 75%;
+        border-top-style: solid;
+        opacity: 0.25;
+      }
+
+      .answer-grid .vertical-guide,
+      .answer-grid .horizontal-guide {
+        position: absolute;
+        border-left: 1px dashed rgba(0, 0, 0, 0.25);
+        z-index: 0;
+      }
+
+      .answer-grid .vertical-guide {
+        top: 12px;
+        bottom: 12px;
+        width: 0;
+      }
+
+      .answer-grid .vertical-guide.guide-1 {
+        left: 20%;
+      }
+
+      .answer-grid .vertical-guide.guide-2 {
+        left: 60%;
+      }
+
+      .answer-grid colgroup col {
+        width: auto;
       }
 
       .answer-sheet .hint {
@@ -318,7 +375,17 @@
         <span class="marker marker-top-right"></span>
         <span class="marker marker-bottom-left"></span>
         <span class="marker marker-bottom-right"></span>
+        <span class="vertical-guide guide-1"></span>
+        <span class="vertical-guide guide-2"></span>
         <table>
+          <colgroup>
+            <col class="question-col" />
+            <col class="option-col" />
+            <col class="option-col" />
+            <col class="option-col" />
+            <col class="option-col" />
+            <col class="option-col" />
+          </colgroup>
           <thead>
             <tr>
               <th>Questão</th>

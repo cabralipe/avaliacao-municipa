@@ -57,6 +57,20 @@ def build_prova_pdf_context(prova: ProvaAluno) -> dict[str, Any]:
         'qr_payload': prova.qr_payload,
         'questoes': questoes_info,
         'total_questoes': len(questoes_info),
+        'gabarito_layout': {
+            'columns': ['questao', 'A', 'B', 'C', 'D', 'E'],
+            'column_width_mm': [20, 16, 16, 16, 16, 16],
+            'row_height_mm': 12,
+            'grid_padding_mm': {'top': 18, 'bottom': 18, 'left': 22, 'right': 22},
+            'marker_size_mm': 14,
+            'marker_offset_mm': 12,
+            'marker_positions': [
+                {'id': 'M1', 'placement': 'top_left'},
+                {'id': 'M2', 'placement': 'top_right'},
+                {'id': 'M3', 'placement': 'bottom_left'},
+                {'id': 'M4', 'placement': 'bottom_right'},
+            ],
+        },
     }
 
 
@@ -241,5 +255,13 @@ class ProvaAlunoViewSet(TenantScopedViewSet):
                 'caderno_codigo': getattr(prova.caderno, 'codigo', None),
             },
             'gabarito': gabarito_data,
+            'layout': {
+                'rows': len(questoes),
+                'columns': 5,
+                'marker_size_mm': 14,
+                'marker_margin_mm': 12,
+                'grid_padding_mm': 18,
+                'notes': 'Marcadores posicionados nos quatro cantos do gabarito, com offset aproximado de 12mm e tamanho 14mm.'
+            },
         }
         return Response(response_data)
