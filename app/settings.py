@@ -74,6 +74,19 @@ DATABASES = {
     }
 }
 
+_USE_SQLITE_ENV = os.getenv('USE_SQLITE_FOR_TESTS')
+USE_SQLITE_FOR_TESTS = (
+    _USE_SQLITE_ENV.lower() in {'1', 'true', 'yes'}
+    if _USE_SQLITE_ENV is not None
+    else 'PYTEST_CURRENT_TEST' in os.environ
+)
+
+if USE_SQLITE_FOR_TESTS:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
