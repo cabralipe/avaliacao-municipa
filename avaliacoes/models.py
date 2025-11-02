@@ -10,6 +10,8 @@ class Avaliacao(models.Model):
     titulo = models.CharField(max_length=255)
     data_aplicacao = models.DateField()
     turmas = models.ManyToManyField(Turma, blank=True)
+    liberada_para_professores = models.BooleanField(default=False)
+    habilitar_correcao_qr = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         return self.titulo

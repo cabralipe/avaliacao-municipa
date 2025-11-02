@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client';
 import type { PaginatedResponse } from '../types';
@@ -22,7 +22,7 @@ export function usePaginatedResource<T>({
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(initialPageSize);
 
-  const query = useQuery({
+  const query = useQuery<PaginatedResponse<T>>({
     queryKey: [...queryKey, page, pageSize, params],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<T>>(url, {
@@ -30,7 +30,7 @@ export function usePaginatedResource<T>({
       });
       return data;
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled,
   });
 

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -33,6 +34,8 @@ interface AvaliacaoInput {
   titulo: string;
   data_aplicacao: string;
   turmas: number[];
+  liberada_para_professores: boolean;
+  habilitar_correcao_qr: boolean;
 }
 
 async function fetchTurmas(): Promise<Turma[]> {
@@ -59,7 +62,13 @@ export function AvaliacoesPage() {
     initialPageSize: 10,
   });
 
-  const [form, setForm] = useState<AvaliacaoInput>({ titulo: '', data_aplicacao: '', turmas: [] });
+  const [form, setForm] = useState<AvaliacaoInput>({
+    titulo: '',
+    data_aplicacao: '',
+    turmas: [],
+    liberada_para_professores: false,
+    habilitar_correcao_qr: false
+  });
   const [editing, setEditing] = useState<Avaliacao | null>(null);
 
   useEffect(() => {
@@ -67,10 +76,18 @@ export function AvaliacoesPage() {
       setForm({
         titulo: editing.titulo,
         data_aplicacao: editing.data_aplicacao,
-        turmas: editing.turmas
+        turmas: editing.turmas,
+        liberada_para_professores: editing.liberada_para_professores,
+        habilitar_correcao_qr: editing.habilitar_correcao_qr
       });
     } else {
-      setForm({ titulo: '', data_aplicacao: '', turmas: [] });
+      setForm({
+        titulo: '',
+        data_aplicacao: '',
+        turmas: [],
+        liberada_para_professores: false,
+        habilitar_correcao_qr: false
+      });
     }
   }, [editing]);
 
@@ -91,7 +108,13 @@ export function AvaliacoesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['avaliacoes'] });
       setEditing(null);
-      setForm({ titulo: '', data_aplicacao: '', turmas: [] });
+      setForm({
+        titulo: '',
+        data_aplicacao: '',
+        turmas: [],
+        liberada_para_professores: false,
+        habilitar_correcao_qr: false
+      });
     }
   });
 
@@ -110,6 +133,25 @@ export function AvaliacoesPage() {
     const values = Array.isArray(value) ? value : value.split(',');
     setForm((prev) => ({ ...prev, turmas: values.map((item) => Number(item)) }));
   };
+
+  const toggleMutation = useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      field: 'liberada_para_professores' | 'habilitar_correcao_qr';
+      value: boolean;
+    }) => {
+      await apiClient.patch(`/avaliacoes/avaliacoes/${payload.id}/`, {
+        [payload.field]: payload.value
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['avaliacoes'] })
+  });
+
+  const handleToggle =
+    (avaliacao: Avaliacao, field: 'liberada_para_professores' | 'habilitar_correcao_qr') =>
+    (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      toggleMutation.mutate({ id: avaliacao.id, field, value: checked });
+    };
 
   const actionLabel = editing ? 'Atualizar avaliação' : 'Cadastrar avaliação';
 
@@ -198,20 +240,22 @@ export function AvaliacoesPage() {
                   <TableCell>Título</TableCell>
                   <TableCell>Data</TableCell>
                   <TableCell>Turmas</TableCell>
+                  <TableCell align="center">Download liberado</TableCell>
+                  <TableCell align="center">Correção via QR</TableCell>
                   <TableCell align="right">Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={7} align="center">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 )}
                 {!isLoading && avaliacoes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={7} align="center">
                       Nenhuma avaliação cadastrada.
                     </TableCell>
                   </TableRow>
@@ -225,6 +269,24 @@ export function AvaliacoesPage() {
                       {avaliacao.turmas
                         .map((id) => turmasMap.get(id)?.nome ?? id)
                         .join(', ') || '—'}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Switch
+                        checked={avaliacao.liberada_para_professores}
+                        onChange={handleToggle(avaliacao, 'liberada_para_professores')}
+                        inputProps={{
+                          'aria-label': `Liberar download da avaliação ${avaliacao.titulo}`
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Switch
+                        checked={avaliacao.habilitar_correcao_qr}
+                        onChange={handleToggle(avaliacao, 'habilitar_correcao_qr')}
+                        inputProps={{
+                          'aria-label': `Habilitar correção via QR da avaliação ${avaliacao.titulo}`
+                        }}
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">

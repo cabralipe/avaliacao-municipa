@@ -19,6 +19,7 @@ import { RespostasPage } from './pages/respostas/RespostasPage';
 import { GabaritosPage } from './pages/respostas/GabaritosPage';
 import { ProfHabilidadePage } from './pages/relatorios/ProfHabilidadePage';
 import { SecretariasPage } from './pages/core/SecretariasPage';
+import { ProfessorProvasPage } from './pages/professor/ProfessorProvasPage';
 
 export default function App() {
   const { loading } = useAuth();
@@ -131,6 +132,14 @@ export default function App() {
           element={
             <RequireRole allowed={['admin']}>
               <GabaritosPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="professor/provas"
+          element={
+            <RequireRole allowed={['professor']}>
+              <ProfessorProvasPage />
             </RequireRole>
           }
         />

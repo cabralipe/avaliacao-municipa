@@ -21,7 +21,15 @@ class CadernoSerializer(serializers.ModelSerializer):
 class AvaliacaoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avaliacao
-        fields = ['id', 'secretaria', 'titulo', 'data_aplicacao', 'turmas']
+        fields = [
+            'id',
+            'secretaria',
+            'titulo',
+            'data_aplicacao',
+            'turmas',
+            'liberada_para_professores',
+            'habilitar_correcao_qr',
+        ]
         read_only_fields = ['secretaria']
 
 
@@ -31,33 +39,44 @@ class ProvaAlunoSerializer(serializers.ModelSerializer):
         fields = ['id', 'secretaria', 'avaliacao', 'aluno', 'caderno', 'qr_payload']
         read_only_fields = ['secretaria']
 
-    def _build_payload(self, validated_data):
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        instance.qr_payload = self._build_payload(instance=instance, validated_data=validated_data)
+        instance.save(update_fields=['qr_payload'])
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        instance.qr_payload = self._build_payload(instance=instance, validated_data=validated_data)
+        instance.save(update_fields=['qr_payload'])
+        return instance
+
+    def _build_payload(self, *, instance, validated_data):
         payload_source = validated_data.get('qr_payload')
-        if payload_source is None and self.instance is not None:
-            payload_source = getattr(self.instance, 'qr_payload', {})
+        if payload_source is None:
+            payload_source = getattr(instance, 'qr_payload', {})
         payload = payload_source or {}
         if not isinstance(payload, dict):
             payload = {}
 
-        aluno = validated_data.get('aluno') or getattr(self.instance, 'aluno', None)
-        avaliacao = validated_data.get('avaliacao') or getattr(self.instance, 'avaliacao', None)
-        caderno = validated_data.get('caderno') or getattr(self.instance, 'caderno', None)
+        aluno = validated_data.get('aluno') or getattr(instance, 'aluno', None)
+        avaliacao = validated_data.get('avaliacao') or getattr(instance, 'avaliacao', None)
+        caderno = validated_data.get('caderno') or getattr(instance, 'caderno', None)
 
         if aluno is not None:
             payload['aluno_id'] = aluno.id
-            payload['aluno_nome'] = aluno.nome
+            payload['aluno_nome'] = getattr(aluno, 'nome', payload.get('aluno_nome'))
         if avaliacao is not None:
             payload['avaliacao_id'] = avaliacao.id
-            payload['avaliacao_titulo'] = avaliacao.titulo
+            payload['avaliacao_titulo'] = getattr(
+                avaliacao, 'titulo', payload.get('avaliacao_titulo')
+            )
         if caderno is not None:
             payload['caderno_id'] = caderno.id
+        elif 'caderno_id' in payload and instance.caderno_id is None:
+            payload.pop('caderno_id', None)
 
-        validated_data['qr_payload'] = payload
+        if instance.id is not None:
+            payload['prova_id'] = instance.id
 
-    def create(self, validated_data):
-        self._build_payload(validated_data)
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        self._build_payload(validated_data)
-        return super().update(instance, validated_data)
+        return payload

@@ -35,6 +35,7 @@ import ChecklistRtlRoundedIcon from '@mui/icons-material/ChecklistRtlRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
+import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 
 import { useAuth } from '../../hooks/useAuth';
 import type { Role } from '../../types';
@@ -94,7 +95,13 @@ const sections: NavSection[] = [
     items: [
       { label: 'Avaliações', to: '/avaliacoes', icon: AssessmentRoundedIcon, roles: ['admin'] },
       { label: 'Cadernos', to: '/avaliacoes/cadernos', icon: MenuBookRoundedIcon, roles: ['admin'] },
-      { label: 'Provas', to: '/avaliacoes/provas', icon: AssignmentTurnedInRoundedIcon, roles: ['admin'] }
+      { label: 'Provas', to: '/avaliacoes/provas', icon: AssignmentTurnedInRoundedIcon, roles: ['admin'] },
+      {
+        label: 'Minhas Provas',
+        to: '/professor/provas',
+        icon: QrCodeScannerRoundedIcon,
+        roles: ['professor']
+      }
     ]
   },
   {

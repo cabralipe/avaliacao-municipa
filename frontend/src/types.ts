@@ -80,6 +80,8 @@ export interface Avaliacao {
   titulo: string;
   data_aplicacao: string;
   turmas: number[];
+  liberada_para_professores: boolean;
+  habilitar_correcao_qr: boolean;
 }
 
 export interface Caderno {
