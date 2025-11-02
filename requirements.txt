@@ -9,3 +9,5 @@ pydantic[dotenv]
 jinja2
 playwright
 django-filter
+gunicorn
+whitenoise

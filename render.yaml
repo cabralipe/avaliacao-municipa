@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: avaliacao-backend
+    env: python
+    region: oregon
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: gunicorn app.wsgi --log-file -
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
+      - key: DJANGO_SETTINGS_MODULE
+        value: app.settings
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "False"
+  - type: static
+    name: avaliacao-frontend
+    region: oregon
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    publishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
