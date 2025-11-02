@@ -20,6 +20,7 @@ import { GabaritosPage } from './pages/respostas/GabaritosPage';
 import { ProfHabilidadePage } from './pages/relatorios/ProfHabilidadePage';
 import { SecretariasPage } from './pages/core/SecretariasPage';
 import { ProfessorProvasPage } from './pages/professor/ProfessorProvasPage';
+import { ProfessorGabaritoReaderPage } from './pages/professor/ProfessorGabaritoReaderPage';
 
 export default function App() {
   const { loading } = useAuth();
@@ -140,6 +141,14 @@ export default function App() {
           element={
             <RequireRole allowed={['professor']}>
               <ProfessorProvasPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="professor/gabarito"
+          element={
+            <RequireRole allowed={['professor']}>
+              <ProfessorGabaritoReaderPage />
             </RequireRole>
           }
         />

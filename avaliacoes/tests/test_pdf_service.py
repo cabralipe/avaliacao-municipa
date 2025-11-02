@@ -86,7 +86,22 @@ def test_render_prova_pdf_creates_file(monkeypatch, tmp_path):
         'titulo': 'Prova de Matemática',
         'aluno_nome': 'Fulano',
         'turma_nome': '6º A',
-        'questoes': [{'enunciado': 'Quanto é 2 + 2?'}],
+        'escola_nome': 'Escola Municipal Central',
+        'data_aplicacao': '2025-11-10',
+        'questoes': [
+            {
+                'ordem': 1,
+                'enunciado': 'Quanto é 2 + 2?',
+                'alternativas': [
+                    {'letra': 'A', 'texto': '1'},
+                    {'letra': 'B', 'texto': '2'},
+                    {'letra': 'C', 'texto': '3'},
+                    {'letra': 'D', 'texto': '4'},
+                    {'letra': 'E', 'texto': '5'},
+                ],
+            }
+        ],
+        'total_questoes': 1,
         'qr_payload': {'token': 'abc'},
     }
 

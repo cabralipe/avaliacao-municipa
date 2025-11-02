@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any
 
 from django.utils.text import slugify
 from django.http import HttpResponse
@@ -17,6 +18,46 @@ from .serializers import (
     CadernoSerializer,
     ProvaAlunoSerializer,
 )
+
+
+def build_prova_pdf_context(prova: ProvaAluno) -> dict[str, Any]:
+    avaliacao = prova.avaliacao
+    aluno = prova.aluno
+    turma = getattr(aluno, 'turma', None)
+    escola = getattr(turma, 'escola', None)
+
+    questoes_info: list[dict[str, Any]] = []
+    if prova.caderno:
+        caderno_questoes = (
+            prova.caderno.cadernoquestao_set.select_related('questao').all().order_by('ordem')
+        )
+        for cq in caderno_questoes:
+            questao = cq.questao
+            alternativas = [
+                {'letra': 'A', 'texto': questao.alternativa_a},
+                {'letra': 'B', 'texto': questao.alternativa_b},
+                {'letra': 'C', 'texto': questao.alternativa_c},
+                {'letra': 'D', 'texto': questao.alternativa_d},
+                {'letra': 'E', 'texto': questao.alternativa_e},
+            ]
+            questoes_info.append(
+                {
+                    'ordem': cq.ordem,
+                    'enunciado': questao.enunciado,
+                    'alternativas': alternativas,
+                }
+            )
+
+    return {
+        'titulo': avaliacao.titulo,
+        'data_aplicacao': getattr(avaliacao, 'data_aplicacao', None),
+        'aluno_nome': getattr(aluno, 'nome', ''),
+        'turma_nome': getattr(turma, 'nome', ''),
+        'escola_nome': getattr(escola, 'nome', ''),
+        'qr_payload': prova.qr_payload,
+        'questoes': questoes_info,
+        'total_questoes': len(questoes_info),
+    }
 
 
 class AvaliacaoViewSet(TenantScopedViewSet):
@@ -44,21 +85,11 @@ class AvaliacaoViewSet(TenantScopedViewSet):
         gerados = []
         provas = (
             ProvaAluno.objects.filter(avaliacao=avaliacao)
-            .select_related('aluno', 'aluno__turma', 'caderno')
+            .select_related('aluno', 'aluno__turma', 'aluno__turma__escola', 'caderno')
             .prefetch_related('caderno__cadernoquestao_set__questao')
         )
         for prova in provas:
-            questoes = [
-                cq.questao
-                for cq in prova.caderno.cadernoquestao_set.all().order_by('ordem')
-            ]
-            contexto = {
-                'titulo': avaliacao.titulo,
-                'aluno_nome': prova.aluno.nome,
-                'turma_nome': prova.aluno.turma.nome,
-                'questoes': questoes,
-                'qr_payload': prova.qr_payload,
-            }
+            contexto = build_prova_pdf_context(prova)
             aluno_slug = slugify(prova.aluno.nome) or f'aluno-{prova.aluno_id}'
             pdf_path = saida_dir / f'prova_{aluno_slug}.pdf'
             render_prova_pdf(contexto, pdf_path)
@@ -93,9 +124,29 @@ class CadernoQuestaoViewSet(TenantScopedViewSet):
         'destroy': ['admin'],
     }
 
+    def get_queryset(self):
+        queryset = CadernoQuestao.objects.select_related(
+            'caderno', 'caderno__secretaria', 'questao'
+        )
+        user = self.request.user
+        if getattr(user, 'role', '') == 'superadmin':
+            return queryset
+        user_sec = getattr(user, 'secretaria_id', None)
+        if user_sec is None:
+            return queryset.none()
+        return queryset.filter(caderno__secretaria_id=user_sec)
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def perform_update(self, serializer):
+        serializer.save()
+
 
 class ProvaAlunoViewSet(TenantScopedViewSet):
-    queryset = ProvaAluno.objects.select_related('avaliacao', 'aluno', 'aluno__turma', 'caderno')
+    queryset = ProvaAluno.objects.select_related(
+        'avaliacao', 'aluno', 'aluno__turma', 'aluno__turma__escola', 'caderno'
+    )
     serializer_class = ProvaAlunoSerializer
     filterset_fields = ['avaliacao_id', 'aluno_id']
     role_permissions = {
@@ -120,22 +171,6 @@ class ProvaAlunoViewSet(TenantScopedViewSet):
             return avaliacao.habilitar_correcao_qr
         return avaliacao.liberada_para_professores
 
-    def _prova_pdf_contexto(self, prova: ProvaAluno):
-        avaliacao = prova.avaliacao
-        aluno = prova.aluno
-        turma_nome = getattr(getattr(aluno, 'turma', None), 'nome', '')
-        questoes = [
-            cq.questao
-            for cq in prova.caderno.cadernoquestao_set.select_related('questao').all().order_by('ordem')
-        ]
-        return {
-            'titulo': avaliacao.titulo,
-            'aluno_nome': aluno.nome,
-            'turma_nome': turma_nome,
-            'questoes': questoes,
-            'qr_payload': prova.qr_payload,
-        }
-
     @action(detail=True, methods=['get'], url_path='download')
     def download(self, request, pk=None):
         prova = self.get_object()
@@ -147,7 +182,7 @@ class ProvaAlunoViewSet(TenantScopedViewSet):
         if not self._has_professor_permission(request, prova, for_qr=False):
             return Response(status=status.HTTP_403_FORBIDDEN)
 
-        contexto = self._prova_pdf_contexto(prova)
+        contexto = build_prova_pdf_context(prova)
         with NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
             temp_path = Path(temp_file.name)
 

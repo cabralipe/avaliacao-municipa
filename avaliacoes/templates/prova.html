@@ -4,26 +4,348 @@
     <meta charset="utf-8">
     <title>{{ titulo }}</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 0 auto; width: 90%; }
-      h1 { text-align: center; }
-      .header { margin-bottom: 20px; }
-      .qr { text-align: right; }
-      ol { padding-left: 1.2em; }
-      li { margin-bottom: 1em; }
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20mm 15mm;
+        color: #111;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-weight: 700;
+        color: #0d0d0d;
+      }
+
+      h1 {
+        font-size: 22px;
+        text-align: center;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        font-size: 16px;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+      }
+
+      p {
+        margin: 0 0 6px;
+      }
+
+      .first-page {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: calc(297mm - 40mm);
+        page-break-after: always;
+      }
+
+      .info-block {
+        margin-bottom: 18px;
+      }
+
+      .meta {
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 12px 16px;
+        background-color: #fdfdfd;
+      }
+
+      .meta dl {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 6px 14px;
+        margin: 0;
+      }
+
+      .meta dt {
+        font-weight: 600;
+        color: #333;
+      }
+
+      .meta dd {
+        margin: 0;
+        color: #111;
+      }
+
+      .qr {
+        display: flex;
+        justify-content: center;
+        margin-top: 30px;
+      }
+
+      .qr img {
+        width: 120px;
+        height: 120px;
+      }
+
+      .instructions {
+        margin-top: 24px;
+        border-top: 1px solid #e0e0e0;
+        padding-top: 16px;
+        font-size: 12px;
+        color: #444;
+      }
+
+      .questions-section {
+        page-break-after: always;
+      }
+
+      .question {
+        margin-bottom: 22px;
+        break-inside: avoid;
+      }
+
+      .question-number {
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .question-text {
+        margin-bottom: 10px;
+      }
+
+      .answer-options {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .answer-option {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 8px;
+      }
+
+      .option-letter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        width: 22px;
+        margin-right: 8px;
+      }
+
+      .option-text {
+        flex: 1;
+      }
+
+      .option-box {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 1px solid #444;
+        margin-left: 8px;
+      }
+
+      .answer-sheet {
+        page-break-before: always;
+      }
+
+      .answer-grid {
+        position: relative;
+        margin-top: 12px;
+        padding: 16px 18px;
+        border: 2px solid #111;
+        border-radius: 6px;
+        background-color: #fff;
+        overflow: visible;
+      }
+
+      .answer-grid table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .answer-grid th,
+      .answer-grid td {
+        border: 1px solid #111;
+        text-align: center;
+        padding: 4px 0;
+      }
+
+      .answer-grid th {
+        background-color: #f0f0f0;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .answer-grid td {
+        height: 22px;
+      }
+
+      .answer-grid .question-cell {
+        font-weight: 600;
+        width: 12%;
+      }
+
+      .answer-grid .option-cell {
+        width: 17.6%;
+        position: relative;
+      }
+
+      .answer-grid .mark-box {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 1px solid #111;
+        border-radius: 2px;
+      }
+
+      .answer-grid .marker {
+        position: absolute;
+        width: 14mm;
+        height: 14mm;
+        background-color: #111;
+        border-radius: 2mm;
+        box-shadow: 0 0 0 2px #111;
+        z-index: 0;
+      }
+
+      .answer-grid .marker-top-left {
+        top: -12mm;
+        left: -12mm;
+      }
+
+      .answer-grid .marker-top-right {
+        top: -12mm;
+        right: -12mm;
+      }
+
+      .answer-grid .marker-bottom-left {
+        bottom: -12mm;
+        left: -12mm;
+      }
+
+      .answer-grid .marker-bottom-right {
+        bottom: -12mm;
+        right: -12mm;
+      }
+
+      .answer-grid::before,
+      .answer-grid::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px dashed rgba(0, 0, 0, 0.3);
+        z-index: 0;
+      }
+
+      .answer-grid::before {
+        top: 25%;
+      }
+
+      .answer-grid::after {
+        top: 75%;
+      }
+
+      .answer-sheet .hint {
+        font-size: 11px;
+        color: #444;
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
-    <div class="header">
-      <h1>{{ titulo }}</h1>
-      <p>Aluno: {{ aluno_nome }} — Turma: {{ turma_nome }}</p>
-    </div>
-    <div class="qr">
-      <img src="data:image/png;base64,{{ qr_png_b64 }}" alt="QR Code" />
-    </div>
-    <ol>
+    <section class="first-page">
+      <div class="info-block">
+        <h1>{{ titulo }}</h1>
+        <div class="meta">
+          <dl>
+            <dt>Aluno</dt>
+            <dd>{{ aluno_nome }}</dd>
+            <dt>Escola</dt>
+            <dd>{{ escola_nome or '-' }}</dd>
+            <dt>Turma</dt>
+            <dd>{{ turma_nome or '-' }}</dd>
+            <dt>Data</dt>
+            <dd>{{ data_aplicacao or '-' }}</dd>
+          </dl>
+        </div>
+        <div class="instructions">
+          <p><strong>Instruções:</strong></p>
+          <ul>
+            <li>Confira seus dados antes de iniciar a prova.</li>
+            <li>Responda às questões nas páginas seguintes e marque o gabarito na última página.</li>
+            <li>Ao digitalizar o gabarito, mantenha os marcadores pretos dentro do enquadramento da câmera.</li>
+            <li>Mantenha o gabarito limpo e sem rasuras para facilitar a leitura digital.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="qr">
+        <img src="data:image/png;base64,{{ qr_png_b64 }}" alt="QR Code de identificação" />
+      </div>
+    </section>
+
+    <section class="questions-section">
+      <h2>Questões</h2>
       {% for q in questoes %}
-        <li>{{ q.enunciado }}</li>
+        <article class="question">
+          <div class="question-number">Questão {{ q.ordem }}</div>
+          <div class="question-text">{{ q.enunciado | safe }}</div>
+          <ul class="answer-options">
+            {% for alternativa in q.alternativas %}
+              <li class="answer-option">
+                <span class="option-letter">{{ alternativa.letra }}.</span>
+                <span class="option-text">{{ alternativa.texto | safe }}</span>
+                <span class="option-box"></span>
+              </li>
+            {% endfor %}
+          </ul>
+        </article>
       {% endfor %}
-    </ol>
+    </section>
+
+    <section class="answer-sheet">
+      <h2>Gabarito de respostas</h2>
+      <p>Preencha um quadrado por questão de acordo com a alternativa escolhida.</p>
+      <div class="answer-grid">
+        <span class="marker marker-top-left"></span>
+        <span class="marker marker-top-right"></span>
+        <span class="marker marker-bottom-left"></span>
+        <span class="marker marker-bottom-right"></span>
+        <table>
+          <thead>
+            <tr>
+              <th>Questão</th>
+              <th>A</th>
+              <th>B</th>
+              <th>C</th>
+              <th>D</th>
+              <th>E</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in questoes %}
+              <tr>
+                <td class="question-cell">{{ q.ordem }}</td>
+                {% for letra in ['A', 'B', 'C', 'D', 'E'] %}
+                  <td class="option-cell">
+                    <span class="mark-box"></span>
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">
+        Após preencher, utilize o leitor de gabarito para capturar as respostas e, em seguida, apresente o QR Code para vincular esta prova ao aluno.
+      </p>
+    </section>
   </body>
 </html>

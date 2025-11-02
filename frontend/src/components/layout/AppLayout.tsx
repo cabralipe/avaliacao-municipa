@@ -36,6 +36,7 @@ import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
 import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
+import FactCheckRounded from '@mui/icons-material/FactCheckRounded';
 
 import { useAuth } from '../../hooks/useAuth';
 import type { Role } from '../../types';
@@ -100,6 +101,12 @@ const sections: NavSection[] = [
         label: 'Minhas Provas',
         to: '/professor/provas',
         icon: QrCodeScannerRoundedIcon,
+        roles: ['professor']
+      },
+      {
+        label: 'Leitor de Gabarito',
+        to: '/professor/gabarito',
+        icon: FactCheckRoundedIcon,
         roles: ['professor']
       }
     ]
