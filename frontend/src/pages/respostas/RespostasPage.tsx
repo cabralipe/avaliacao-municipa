@@ -77,6 +77,18 @@ export function RespostasPage() {
     return map;
   }, [provas]);
 
+  const getAlunoNome = (prova: ProvaAluno | undefined) => {
+    if (!prova) {
+      return '';
+    }
+    const payload = prova.qr_payload as { aluno_nome?: unknown };
+    const nome = payload?.aluno_nome;
+    if (typeof nome === 'string' && nome.trim().length > 0) {
+      return nome;
+    }
+    return `Aluno ${prova.aluno}`;
+  };
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!provaId) {
@@ -106,7 +118,7 @@ export function RespostasPage() {
             <MenuItem value="0">Selecione</MenuItem>
             {provas.map((prova) => (
               <MenuItem key={prova.id} value={prova.id}>
-                {`Prova #${prova.id} — Aluno ${prova.aluno}`}
+                {`Prova #${prova.id} — ${getAlunoNome(prova)}`}
               </MenuItem>
             ))}
           </TextField>
@@ -139,7 +151,7 @@ export function RespostasPage() {
             <Typography variant="h6">Respostas registradas</Typography>
             {provaLookup.get(provaId) && (
               <Typography variant="body2" color="text.secondary">
-                {`Prova #${provaId} — Avaliação ${provaLookup.get(provaId)?.avaliacao} — Aluno ${provaLookup.get(provaId)?.aluno}`}
+                {`Prova #${provaId} — Avaliação ${provaLookup.get(provaId)?.avaliacao} — ${getAlunoNome(provaLookup.get(provaId))}`}
               </Typography>
             )}
             <TableContainer>

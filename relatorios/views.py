@@ -10,6 +10,8 @@ class ProfPorHabilidadeView(APIView):
     permission_classes = [IsSameSecretaria]
 
     def get(self, request, secretaria_id: int):
+        if getattr(request.user, 'role', None) not in {'admin', 'superadmin'}:
+            return Response(status=403)
         queryset = (
             Resposta.objects.filter(secretaria_id=secretaria_id, correta=True)
             .values('caderno_questao__questao__habilidade__codigo')

@@ -14,12 +14,28 @@ class RespostaViewSet(TenantScopedViewSet):
     queryset = Resposta.objects.select_related('prova_aluno', 'caderno_questao')
     serializer_class = RespostaSerializer
     filterset_fields = ['prova_aluno_id']
+    role_permissions = {
+        'list': ['admin'],
+        'retrieve': ['admin'],
+        'create': ['admin'],
+        'update': ['admin'],
+        'partial_update': ['admin'],
+        'destroy': ['admin'],
+    }
 
 
 class GabaritoViewSet(TenantScopedViewSet):
     queryset = Gabarito.objects.select_related('caderno_questao', 'caderno_questao__caderno')
     serializer_class = GabaritoSerializer
     filterset_fields = ['caderno_questao__caderno_id']
+    role_permissions = {
+        'list': ['admin'],
+        'retrieve': ['admin'],
+        'create': ['admin'],
+        'update': ['admin'],
+        'partial_update': ['admin'],
+        'destroy': ['admin'],
+    }
 
 
 class ColetaRespostasView(APIView):
@@ -27,6 +43,8 @@ class ColetaRespostasView(APIView):
 
     @transaction.atomic
     def post(self, request):
+        if getattr(request.user, 'role', None) not in {'admin', 'superadmin'}:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         serializer = RespostaInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         prova_aluno = ProvaAluno.objects.select_related('avaliacao', 'caderno', 'aluno').get(

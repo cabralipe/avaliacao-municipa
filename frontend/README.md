@@ -41,3 +41,9 @@ Este diretório contém a aplicação web que consome a API do sistema de avalia
    - **Relatórios**: proficiência por habilidade.
 
 As operações de criação, edição e exclusão atualizam automaticamente as listas em tela.
+
+## Perfis e permissões
+
+- **Superadmin**: acesso completo a todos os módulos; pode alternar entre secretarias.
+- **Admin**: gerencia escolas, turmas, alunos, banco de itens, avaliações, provas, coletas e relatórios.
+- **Professor**: consulta dashboards e o banco de itens; pode cadastrar/editar questões, mas elas ficam como _pendentes_ até aprovação de um administrador e não pode excluí-las.

@@ -20,6 +20,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
+import { useAuth } from '../../hooks/useAuth';
 import type { Competencia } from '../../types';
 
 interface CompetenciaInput {
@@ -41,6 +42,9 @@ export function CompetenciasPage() {
 
   const [form, setForm] = useState<CompetenciaInput>({ codigo: '', descricao: '' });
   const [editing, setEditing] = useState<Competencia | null>(null);
+
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'superadmin';
 
   useEffect(() => {
     if (editing) {
@@ -76,6 +80,7 @@ export function CompetenciasPage() {
   };
 
   const actionLabel = editing ? 'Atualizar competência' : 'Cadastrar competência';
+  const columnsCount = canManage ? 4 : 3;
 
   return (
     <PageContainer>
@@ -84,51 +89,63 @@ export function CompetenciasPage() {
         description="Cadastre competências para relacionar com habilidades e questões."
       />
 
-      <PageSection>
-        <Stack component="form" spacing={{ xs: 2, md: 3 }} onSubmit={handleSubmit}>
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                label="Código"
-                value={form.codigo}
-                onChange={(event) => setForm((prev) => ({ ...prev, codigo: event.target.value }))}
-                required
-                fullWidth
-              />
+      {canManage && (
+        <PageSection>
+          <Stack component="form" spacing={{ xs: 2, md: 3 }} onSubmit={handleSubmit}>
+            <Grid container spacing={{ xs: 2, md: 3 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField
+                  label="Código"
+                  value={form.codigo}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, codigo: event.target.value }))
+                  }
+                  required
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 8 }}>
+                <TextField
+                  label="Descrição"
+                  value={form.descricao}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, descricao: event.target.value }))
+                  }
+                  required
+                  fullWidth
+                  multiline
+                  minRows={2}
+                />
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12, md: 8 }}>
-              <TextField
-                label="Descrição"
-                value={form.descricao}
-                onChange={(event) => setForm((prev) => ({ ...prev, descricao: event.target.value }))}
-                required
-                fullWidth
-                multiline
-                minRows={2}
-              />
-            </Grid>
-          </Grid>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-            {editing && (
-              <Button variant="text" color="inherit" onClick={() => setEditing(null)}>
-                Cancelar
+            <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
+              {editing && (
+                <Button variant="text" color="inherit" onClick={() => setEditing(null)}>
+                  Cancelar
+                </Button>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={<AddRoundedIcon />}
+                disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending ? 'Salvando...' : actionLabel}
               </Button>
-            )}
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={<AddRoundedIcon />}
-              disabled={saveMutation.isPending}
-            >
-              {saveMutation.isPending ? 'Salvando...' : actionLabel}
-            </Button>
+            </Stack>
           </Stack>
-        </Stack>
-      </PageSection>
+        </PageSection>
+      )}
 
       <PageSection>
         <Stack spacing={2}>
           <Typography variant="h6">Competências cadastradas</Typography>
+          {canManage ? null : (
+            <Typography variant="body2" color="text.secondary">
+              Apenas administradores podem cadastrar ou editar competências. Consulte a lista
+              abaixo.
+            </Typography>
+          )}
           <TableContainer>
             <Table>
               <TableHead>
@@ -136,20 +153,20 @@ export function CompetenciasPage() {
                   <TableCell>ID</TableCell>
                   <TableCell>Código</TableCell>
                   <TableCell>Descrição</TableCell>
-                  <TableCell align="right">Ações</TableCell>
+                  {canManage && <TableCell align="right">Ações</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={columnsCount} align="center">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 )}
                 {!isLoading && competencias.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={columnsCount} align="center">
                       Nenhuma competência cadastrada.
                     </TableCell>
                   </TableRow>
@@ -159,24 +176,26 @@ export function CompetenciasPage() {
                     <TableCell>{item.id}</TableCell>
                     <TableCell>{item.codigo}</TableCell>
                     <TableCell>{item.descricao}</TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                        <IconButton
-                          color="primary"
-                          onClick={() => setEditing(item)}
-                          aria-label={`Editar ${item.codigo}`}
-                        >
-                          <EditRoundedIcon />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => deleteMutation.mutate(item.id)}
-                          aria-label={`Excluir ${item.codigo}`}
-                        >
-                          <DeleteRoundedIcon />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
+                    {canManage && (
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                          <IconButton
+                            color="primary"
+                            onClick={() => setEditing(item)}
+                            aria-label={`Editar ${item.codigo}`}
+                          >
+                            <EditRoundedIcon />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            aria-label={`Excluir ${item.codigo}`}
+                          >
+                            <DeleteRoundedIcon />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

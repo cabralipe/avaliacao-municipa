@@ -36,6 +36,7 @@ import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 
 import { useAuth } from '../../hooks/useAuth';
+import type { Role } from '../../types';
 
 const drawerWidth = 280;
 
@@ -43,6 +44,7 @@ interface NavItem {
   label: string;
   to: string;
   icon: ElementType;
+  roles?: Role[];
 }
 
 interface NavSection {
@@ -58,32 +60,52 @@ const sections: NavSection[] = [
   {
     title: 'Escolas',
     items: [
-      { label: 'Escolas', to: '/escolas', icon: SchoolRoundedIcon },
-      { label: 'Turmas', to: '/escolas/turmas', icon: Groups2RoundedIcon },
-      { label: 'Alunos', to: '/escolas/alunos', icon: Diversity3RoundedIcon }
+      { label: 'Escolas', to: '/escolas', icon: SchoolRoundedIcon, roles: ['admin'] },
+      { label: 'Turmas', to: '/escolas/turmas', icon: Groups2RoundedIcon, roles: ['admin'] },
+      { label: 'Alunos', to: '/escolas/alunos', icon: Diversity3RoundedIcon, roles: ['admin'] }
     ]
   },
   {
     title: 'Banco de Itens',
     items: [
-      { label: 'Competências', to: '/itens/competencias', icon: TrackChangesRoundedIcon },
-      { label: 'Habilidades', to: '/itens/habilidades', icon: BoltRoundedIcon },
-      { label: 'Questões', to: '/itens/questoes', icon: QuizRoundedIcon }
+      {
+        label: 'Competências',
+        to: '/itens/competencias',
+        icon: TrackChangesRoundedIcon,
+        roles: ['admin', 'professor']
+      },
+      {
+        label: 'Habilidades',
+        to: '/itens/habilidades',
+        icon: BoltRoundedIcon,
+        roles: ['admin', 'professor']
+      },
+      {
+        label: 'Questões',
+        to: '/itens/questoes',
+        icon: QuizRoundedIcon,
+        roles: ['admin', 'professor']
+      }
     ]
   },
   {
     title: 'Avaliações',
     items: [
-      { label: 'Avaliações', to: '/avaliacoes', icon: AssessmentRoundedIcon },
-      { label: 'Cadernos', to: '/avaliacoes/cadernos', icon: MenuBookRoundedIcon },
-      { label: 'Provas', to: '/avaliacoes/provas', icon: AssignmentTurnedInRoundedIcon }
+      { label: 'Avaliações', to: '/avaliacoes', icon: AssessmentRoundedIcon, roles: ['admin'] },
+      { label: 'Cadernos', to: '/avaliacoes/cadernos', icon: MenuBookRoundedIcon, roles: ['admin'] },
+      { label: 'Provas', to: '/avaliacoes/provas', icon: AssignmentTurnedInRoundedIcon, roles: ['admin'] }
     ]
   },
   {
     title: 'Respostas',
     items: [
-      { label: 'Respostas', to: '/respostas', icon: FactCheckRoundedIcon },
-      { label: 'Gabaritos', to: '/respostas/gabaritos', icon: ChecklistRtlRoundedIcon }
+      { label: 'Respostas', to: '/respostas', icon: FactCheckRoundedIcon, roles: ['admin'] },
+      {
+        label: 'Gabaritos',
+        to: '/respostas/gabaritos',
+        icon: ChecklistRtlRoundedIcon,
+        roles: ['admin']
+      }
     ]
   },
   {
@@ -92,7 +114,8 @@ const sections: NavSection[] = [
       {
         label: 'Proficiência por Habilidade',
         to: '/relatorios/proficiencia-habilidade',
-        icon: InsightsRoundedIcon
+        icon: InsightsRoundedIcon,
+        roles: ['admin']
       }
     ]
   }
@@ -123,6 +146,25 @@ export function AppLayout() {
       .toUpperCase();
   }, [user]);
 
+  const userRole = user?.role ?? null;
+
+  const visibleSections = useMemo(() => {
+    if (!userRole) {
+      return [];
+    }
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          if (!item.roles || item.roles.length === 0) {
+            return true;
+          }
+          return item.roles.includes(userRole) || userRole === 'superadmin';
+        })
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [userRole]);
+
   const handleDrawerToggle = () => {
     setMobileOpen((prev) => !prev);
   };
@@ -149,7 +191,7 @@ export function AppLayout() {
       <Divider />
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 2 }}>
         <List disablePadding sx={{ mt: 1 }}>
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <Box component="nav" key={section.title} sx={{ mb: 2 }}>
               <Typography
                 variant="overline"

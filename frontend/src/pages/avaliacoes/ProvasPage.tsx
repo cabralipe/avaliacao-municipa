@@ -28,7 +28,6 @@ interface ProvaInput {
   avaliacao: number;
   aluno: number;
   caderno: number | '';
-  qr_payload: string;
 }
 
 async function fetchProvas(): Promise<ProvaAluno[]> {
@@ -61,8 +60,7 @@ export function ProvasPage() {
   const [form, setForm] = useState<ProvaInput>({
     avaliacao: 0,
     aluno: 0,
-    caderno: '',
-    qr_payload: JSON.stringify({}, null, 2)
+    caderno: ''
   });
   const [editing, setEditing] = useState<ProvaAluno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,15 +70,13 @@ export function ProvasPage() {
       setForm({
         avaliacao: editing.avaliacao,
         aluno: editing.aluno,
-        caderno: editing.caderno ?? '',
-        qr_payload: JSON.stringify(editing.qr_payload ?? {}, null, 2)
+        caderno: editing.caderno ?? ''
       });
     } else {
       setForm({
         avaliacao: avaliacoes[0]?.id ?? 0,
         aluno: alunos[0]?.id ?? 0,
-        caderno: '',
-        qr_payload: JSON.stringify({}, null, 2)
+        caderno: ''
       });
     }
   }, [editing, avaliacoes, alunos]);
@@ -105,11 +101,11 @@ export function ProvasPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: ProvaInput) => {
-      const body = {
+      const body: Record<string, unknown> = {
         avaliacao: payload.avaliacao,
         aluno: payload.aluno,
         caderno: payload.caderno || null,
-        qr_payload: JSON.parse(payload.qr_payload || '{}')
+        qr_payload: editing?.qr_payload ?? {}
       };
       if (editing) {
         await apiClient.put(`/avaliacoes/provas/${editing.id}/`, body);
@@ -124,8 +120,7 @@ export function ProvasPage() {
       setForm({
         avaliacao: avaliacoes[0]?.id ?? 0,
         aluno: alunos[0]?.id ?? 0,
-        caderno: '',
-        qr_payload: JSON.stringify({}, null, 2)
+        caderno: ''
       });
     },
     onError: (err) => {
@@ -141,12 +136,6 @@ export function ProvasPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    try {
-      JSON.parse(form.qr_payload || '{}');
-    } catch (parseError) {
-      setError('JSON do QR Code inválido.');
-      return;
-    }
     setError(null);
     saveMutation.mutate(form);
   };
@@ -226,15 +215,6 @@ export function ProvasPage() {
               </TextField>
             </Grid>
           </Grid>
-
-          <TextField
-            label="Dados do QR Code (JSON)"
-            value={form.qr_payload}
-            onChange={(event) => setForm((prev) => ({ ...prev, qr_payload: event.target.value }))}
-            multiline
-            minRows={6}
-            fullWidth
-          />
 
           <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
             {editing && (

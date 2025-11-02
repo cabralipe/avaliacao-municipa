@@ -22,6 +22,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import { apiClient } from '../../api/client';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
+import { useAuth } from '../../hooks/useAuth';
 import type { Competencia, Habilidade, Questao } from '../../types';
 
 interface QuestaoInput {
@@ -83,6 +84,11 @@ export function QuestoesPage() {
   const [form, setForm] = useState<QuestaoInput>(initialState);
   const [editing, setEditing] = useState<Questao | null>(null);
 
+  const { user } = useAuth();
+  const role = user?.role ?? 'professor';
+  const canModerate = role === 'admin' || role === 'superadmin';
+  const canDelete = canModerate;
+
   useEffect(() => {
     if (editing) {
       setForm({
@@ -104,11 +110,15 @@ export function QuestoesPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: QuestaoInput) => {
-      const body = {
-        ...payload,
-        competencia: payload.competencia || null,
-        habilidade: payload.habilidade || null
+      const { competencia, habilidade, status, ...rest } = payload;
+      const body: Record<string, unknown> = {
+        ...rest,
+        competencia: competencia || null,
+        habilidade: habilidade || null
       };
+      if (canModerate) {
+        body.status = status;
+      }
       if (editing) {
         await apiClient.put(`/itens/questoes/${editing.id}/`, body);
       } else {
@@ -244,20 +254,34 @@ export function QuestoesPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                select
-                label="Status"
-                value={form.status}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, status: event.target.value as QuestaoInput['status'] }))
-                }
-                fullWidth
-              >
-                <MenuItem value="pendente">Pendente</MenuItem>
-                <MenuItem value="aprovada">Aprovada</MenuItem>
-              </TextField>
-            </Grid>
+            {canModerate ? (
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  select
+                  label="Status"
+                  value={form.status}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      status: event.target.value as QuestaoInput['status']
+                    }))
+                  }
+                  fullWidth
+                >
+                  <MenuItem value="pendente">Pendente</MenuItem>
+                  <MenuItem value="aprovada">Aprovada</MenuItem>
+                </TextField>
+              </Grid>
+            ) : (
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  label="Status"
+                  value={form.status === 'aprovada' ? 'Aprovada' : 'Pendente'}
+                  disabled
+                  fullWidth
+                />
+              </Grid>
+            )}
           </Grid>
 
           <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
@@ -339,13 +363,15 @@ export function QuestoesPage() {
                         >
                           <EditRoundedIcon />
                         </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => deleteMutation.mutate(questao.id)}
-                          aria-label={`Excluir questão ${questao.id}`}
-                        >
-                          <DeleteRoundedIcon />
-                        </IconButton>
+                        {canDelete && (
+                          <IconButton
+                            color="error"
+                            onClick={() => deleteMutation.mutate(questao.id)}
+                            aria-label={`Excluir questão ${questao.id}`}
+                          >
+                            <DeleteRoundedIcon />
+                          </IconButton>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>

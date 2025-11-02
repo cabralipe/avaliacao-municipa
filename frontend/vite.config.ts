@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: Number(env.VITE_PORT || 5173),
       host: true
+    },
+    build: {
+      chunkSizeWarningLimit: 800
     }
   };
 });
