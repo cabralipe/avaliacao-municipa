@@ -35,6 +35,7 @@ import { apiClient } from '../../api/client';
 import { QrScannerDialog } from '../../components/QrScannerDialog';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
 import { loadOpenCv } from '../../utils/opencv';
+import { analyzeOmrImage } from '../../omr/analysis';
 import type {
   Avaliacao,
   Caderno,
@@ -59,7 +60,7 @@ interface NormalizedRect {
 
 interface CellScore {
   letter: string;
-  darkness: number;
+  percent: number;
 }
 
 interface QuestionAnalysis {
@@ -421,117 +422,27 @@ async function analyzeGabaritoImage(
     workingArea = warpResult.normalizedArea;
   }
 
-  const workingCtx = workingCanvas.getContext('2d');
-  if (!workingCtx) {
-    throw new Error('Canvas não suportado.');
-  }
-
-  const areaX = Math.floor(workingArea.left * workingCanvas.width);
-  const areaY = Math.floor(workingArea.top * workingCanvas.height);
-  const areaWidth = Math.floor(workingArea.width * workingCanvas.width);
-  const areaHeight = Math.floor(workingArea.height * workingCanvas.height);
-
-  const rows = questoes.length;
-  const columns = LETTERS.length;
-  const rowHeight = areaHeight / rows;
-  const columnWidth = areaWidth / columns;
-
-  type DraftResult = { ordem: number; scores: CellScore[] };
-  const draftResults: DraftResult[] = [];
-  const allDarkness: number[] = [];
-
-  for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
-    const questionNumber = questoes[rowIndex].ordem;
-    const scores: CellScore[] = [];
-
-    for (let colIndex = 0; colIndex < columns; colIndex += 1) {
-      const cellX = areaX + colIndex * columnWidth;
-      const cellY = areaY + rowIndex * rowHeight;
-
-      const marginX = columnWidth * 0.18;
-      const marginY = rowHeight * 0.2;
-      const sampleX = Math.floor(cellX + marginX);
-      const sampleY = Math.floor(cellY + marginY);
-      const sampleWidth = Math.max(4, Math.floor(columnWidth - marginX * 2));
-      const sampleHeight = Math.max(4, Math.floor(rowHeight - marginY * 2));
-
-      const imageData = workingCtx.getImageData(sampleX, sampleY, sampleWidth, sampleHeight);
-      const { data } = imageData;
-      const values: number[] = [];
-      let sum = 0;
-
-      const stepX = Math.max(1, Math.floor(sampleWidth / 12));
-      const stepY = Math.max(1, Math.floor(sampleHeight / 12));
-
-      for (let sy = 0; sy < sampleHeight; sy += stepY) {
-        for (let sx = 0; sx < sampleWidth; sx += stepX) {
-          const px = (sy * sampleWidth + sx) * 4;
-          const r = data[px];
-          const g = data[px + 1];
-          const b = data[px + 2];
-          const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          const darkness = 1 - brightness;
-          values.push(darkness);
-          sum += darkness;
-        }
-      }
-
-      const avg = values.length ? sum / values.length : 0;
-      const median = values.length
-        ? values
-            .slice()
-            .sort((a, b) => a - b)[Math.floor(values.length / 2)]
-        : 0;
-      const combined = avg * 0.6 + median * 0.4;
-      scores.push({ letter: LETTERS[colIndex], darkness: combined });
-      allDarkness.push(combined);
-    }
-
-    draftResults.push({ ordem: questionNumber, scores });
-  }
-
-  const samples = allDarkness.length;
-  const mean = samples
-    ? allDarkness.reduce((acc, value) => acc + value, 0) / samples
-    : 0;
-  const variance = samples
-    ? allDarkness.reduce((acc, value) => acc + (value - mean) ** 2, 0) / samples
-    : 0;
-  const stddev = Math.sqrt(variance);
-
-  const sliderThreshold = clamp01(options.threshold);
-  const dynamicThreshold = clamp01(mean + stddev * 0.75);
-  const fallbackThreshold = clamp01(mean + 0.12);
-  const baseThreshold = Math.max(sliderThreshold, dynamicThreshold, fallbackThreshold);
-
-  const results = draftResults.map<QuestionAnalysis>((row) => {
-    const sorted = row.scores.slice().sort((a, b) => b.darkness - a.darkness);
-    const top = sorted[0] ?? { letter: '', darkness: 0 };
-    const runnerUp = sorted[1] ?? { letter: '', darkness: 0 };
-    const rowMean = row.scores.reduce((acc, score) => acc + score.darkness, 0) / row.scores.length;
-    const rowVariance = row.scores.reduce((acc, score) => acc + (score.darkness - rowMean) ** 2, 0) / row.scores.length;
-    const rowStd = Math.sqrt(rowVariance);
-    const rowThreshold = clamp01(Math.max(baseThreshold, rowMean + rowStd * 0.5));
-    const gap = top.darkness - runnerUp.darkness;
-    const minimalGap = Math.max(0.045, stddev * 0.25);
-    const detected = top.darkness >= rowThreshold && gap >= minimalGap ? top.letter : null;
-
-    return {
-      ordem: row.ordem,
-      scores: row.scores,
-      detected
-    };
+  const questoesOrdem = questoes.map((questao) => questao.ordem);
+  const omrOutcome = await analyzeOmrImage(workingCanvas, questoesOrdem, {
+    rows: questoes.length,
+    columns: LETTERS.length,
+    normalizedArea: workingArea,
+    sensitivity: options.threshold
   });
+
+  const results: QuestionAnalysis[] = omrOutcome.results.map((item) => ({
+    ordem: item.ordem,
+    detected: item.detected,
+    scores: item.scores.map((score) => ({
+      letter: score.letter,
+      percent: score.percent
+    }))
+  }));
 
   return {
     area: workingArea,
     results,
-    stats: {
-      mean,
-      stddev,
-      threshold: baseThreshold,
-      samples
-    }
+    stats: omrOutcome.stats
   };
 }
 
@@ -1145,8 +1056,8 @@ export function ProfessorGabaritoReaderPage() {
                     const manual = manualAdjustments[item.ordem];
                     const detected = manual ?? item.detected ?? '';
                     const bestScore = item.scores.reduce(
-                      (acc, current) => (current.darkness > acc.darkness ? current : acc),
-                      { letter: '', darkness: 0 }
+                      (acc, current) => (current.percent > acc.percent ? current : acc),
+                      { letter: '', percent: 0 }
                     );
                     return (
                       <TableRow key={item.ordem} hover>
@@ -1164,7 +1075,7 @@ export function ProfessorGabaritoReaderPage() {
                         </TableCell>
                         <TableCell>
                           {bestScore.letter
-                            ? `${bestScore.letter} (${Math.round(bestScore.darkness * 100)}%)`
+                            ? `${bestScore.letter} (${Math.round(bestScore.percent * 100)}%)`
                             : '—'}
                         </TableCell>
                         <TableCell align="right">

@@ -153,67 +153,81 @@
       }
 
       .answer-grid {
+        --grid-width: 144mm;
+        --grid-padding-top: 18mm;
+        --grid-padding-bottom: 18mm;
+        --grid-padding-left: 22mm;
+        --grid-padding-right: 22mm;
+        --row-height: 12mm;
+        --column-question-width: 20mm;
+        --column-option-width: 16mm;
+        --marker-size: 14mm;
+        --marker-offset: 12mm;
         position: relative;
-        margin-top: 14px;
-        padding: 18px 22px;
-        border: 3px solid #111;
-        border-radius: 8px;
+        width: var(--grid-width);
+        margin: 14px auto 0;
+        border: 2px solid #111;
+        border-radius: 6mm;
         background-color: #fff;
-        overflow: visible;
-        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+        padding: var(--grid-padding-top) var(--grid-padding-right) var(--grid-padding-bottom)
+          var(--grid-padding-left);
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+        min-height: calc(
+          var(--grid-padding-top) + var(--grid-padding-bottom) + var(--rows) * var(--row-height)
+        );
       }
 
       .answer-grid table {
         width: 100%;
+        height: calc(var(--rows) * var(--row-height));
         border-collapse: collapse;
-        margin: 0;
+        table-layout: fixed;
         position: relative;
         z-index: 1;
-        table-layout: fixed;
-      }
-
-      .answer-grid th,
-      .answer-grid td {
-        border: 1px solid #111;
-        text-align: center;
-        padding: 4px 0;
-      }
-
-      .answer-grid th {
-        background-color: #f0f0f0;
         font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
       }
 
-      .answer-grid td {
-        height: 24px;
+      .answer-grid thead th {
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #111;
+        font-size: 11px;
+        letter-spacing: 0.6px;
+        padding-bottom: 3mm;
+      }
+
+      .answer-grid tbody td {
+        text-align: center;
+        vertical-align: middle;
+        height: var(--row-height);
+        padding: 0;
       }
 
       .answer-grid .question-cell {
+        width: var(--column-question-width);
+        text-align: left;
         font-weight: 600;
-        width: 20mm;
-        background-color: rgba(0, 0, 0, 0.03);
+        background-color: rgba(0, 0, 0, 0.05);
+        padding-left: 2mm;
       }
 
       .answer-grid .option-cell {
-        width: 16mm;
-        position: relative;
+        width: var(--column-option-width);
       }
 
       .answer-grid .mark-box {
         display: inline-block;
-        width: 16px;
-        height: 16px;
-        border: 1.2px solid #111;
-        border-radius: 2px;
+        width: 10mm;
+        height: 10mm;
+        border: 1.4px solid #111;
+        border-radius: 50%;
         background-color: #fff;
       }
 
       .answer-grid .marker {
         position: absolute;
-        width: 14mm;
-        height: 14mm;
+        width: var(--marker-size);
+        height: var(--marker-size);
         background-color: #111;
         border-radius: 2mm;
         box-shadow: 0 0 0 2px #111;
@@ -221,23 +235,23 @@
       }
 
       .answer-grid .marker-top-left {
-        top: -12mm;
-        left: -12mm;
+        top: calc(var(--marker-offset) * -1);
+        left: calc(var(--marker-offset) * -1);
       }
 
       .answer-grid .marker-top-right {
-        top: -12mm;
-        right: -12mm;
+        top: calc(var(--marker-offset) * -1);
+        right: calc(var(--marker-offset) * -1);
       }
 
       .answer-grid .marker-bottom-left {
-        bottom: -12mm;
-        left: -12mm;
+        bottom: calc(var(--marker-offset) * -1);
+        left: calc(var(--marker-offset) * -1);
       }
 
       .answer-grid .marker-bottom-right {
-        bottom: -12mm;
-        right: -12mm;
+        bottom: calc(var(--marker-offset) * -1);
+        right: calc(var(--marker-offset) * -1);
       }
 
       .answer-grid .marker::after,
@@ -249,61 +263,34 @@
 
       .answer-grid .marker::after {
         top: 50%;
-        left: 25%;
-        right: 25%;
-        height: 1.8mm;
+        left: 20%;
+        right: 20%;
+        height: 2mm;
         transform: translateY(-50%);
       }
 
       .answer-grid .marker::before {
+        top: 20%;
+        bottom: 20%;
         left: 50%;
-        top: 25%;
-        bottom: 25%;
-        width: 1.8mm;
+        width: 2mm;
         transform: translateX(-50%);
       }
 
-      .answer-grid::before,
-      .answer-grid::after {
-        content: '';
+      .answer-grid .vertical-guide {
         position: absolute;
-        left: 0;
-        right: 0;
-        border-top: 1px dashed rgba(0, 0, 0, 0.3);
-        z-index: 0;
-      }
-
-      .answer-grid::before {
-        top: 25%;
-        border-top-style: solid;
-        opacity: 0.25;
-      }
-
-      .answer-grid::after {
-        top: 75%;
-        border-top-style: solid;
-        opacity: 0.25;
-      }
-
-      .answer-grid .vertical-guide,
-      .answer-grid .horizontal-guide {
-        position: absolute;
+        top: var(--grid-padding-top);
+        bottom: var(--grid-padding-bottom);
         border-left: 1px dashed rgba(0, 0, 0, 0.25);
         z-index: 0;
       }
 
-      .answer-grid .vertical-guide {
-        top: 12px;
-        bottom: 12px;
-        width: 0;
-      }
-
       .answer-grid .vertical-guide.guide-1 {
-        left: 20%;
+        left: calc(var(--grid-padding-left) + var(--column-question-width));
       }
 
       .answer-grid .vertical-guide.guide-2 {
-        left: 60%;
+        right: calc(var(--grid-padding-right) + var(--column-option-width));
       }
 
       .answer-grid colgroup col {
@@ -369,8 +356,8 @@
 
     <section class="answer-sheet">
       <h2>Gabarito de respostas</h2>
-      <p>Preencha um quadrado por questão de acordo com a alternativa escolhida.</p>
-      <div class="answer-grid">
+      <p>Preencha uma bolha por questão, escurecendo completamente a alternativa escolhida.</p>
+      <div class="answer-grid" style="--rows: {{ questoes|length }};">
         <span class="marker marker-top-left"></span>
         <span class="marker marker-top-right"></span>
         <span class="marker marker-bottom-left"></span>
