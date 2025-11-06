@@ -48,3 +48,8 @@ class RespostaInSerializer(serializers.Serializer):
                 raise serializers.ValidationError('Cada resposta deve ser uma das letras A, B, C, D ou E.')
             normalizadas.append(alt)
         return normalizadas
+
+
+class GabaritoAnalysisSerializer(serializers.Serializer):
+    caderno_id = serializers.IntegerField()
+    imagem = serializers.ImageField()

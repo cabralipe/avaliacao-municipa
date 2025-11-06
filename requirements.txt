@@ -11,3 +11,6 @@ playwright
 django-filter
 gunicorn
 whitenoise
+numpy<1.28
+imutils
+opencv-python-headless

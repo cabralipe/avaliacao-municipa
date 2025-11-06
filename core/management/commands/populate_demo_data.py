@@ -46,7 +46,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Base populada com dados de exemplo.'))
         self.stdout.write(self.style.SUCCESS('Usuários criados:'))
         for label, user in usuarios.items():
-            self.stdout.write(f"  - {label}: {user.username} / senha: {label}123")
+            senha = {
+                'superadmin': 'teste_superadmin',
+                'admin': 'teste_admin',
+                'prof': 'teste_professor',
+            }.get(label, 'teste123')
+            self.stdout.write(f"  - {label}: {user.username} / senha: {senha}")
 
     def _purge_data(self):
         Resposta.objects.all().delete()
@@ -76,44 +81,64 @@ class Command(BaseCommand):
         User = get_user_model()
         usuarios = {}
 
-        superadmin, _ = User.objects.get_or_create(
-            username='superadmin',
-            defaults={
-                'email': 'superadmin@example.com',
-                'role': User.ROLE_SUPERADMIN,
+        configs = {
+            'superadmin': {
+                'username': 'test_superadmin',
+                'defaults': {
+                    'email': 'superadmin@test.local',
+                    'role': User.ROLE_SUPERADMIN,
+                    'is_staff': True,
+                    'is_superuser': True,
+                },
+                'password': 'teste_superadmin',
             },
-        )
-        if not superadmin.has_usable_password():
-            superadmin.set_password('superadmin123')
-            superadmin.is_staff = True
-            superadmin.is_superuser = True
-            superadmin.save()
-        usuarios['superadmin'] = superadmin
+            'admin': {
+                'username': 'test_admin',
+                'defaults': {
+                    'email': 'admin@test.local',
+                    'role': User.ROLE_ADMIN,
+                    'secretaria': secretaria,
+                    'is_staff': True,
+                },
+                'password': 'teste_admin',
+            },
+            'prof': {
+                'username': 'test_professor',
+                'defaults': {
+                    'email': 'professor@test.local',
+                    'role': User.ROLE_PROFESSOR,
+                    'secretaria': secretaria,
+                },
+                'password': 'teste_professor',
+            },
+        }
 
-        admin, _ = User.objects.get_or_create(
-            username='admin_demo',
-            defaults={
-                'email': 'admin@example.com',
-                'role': User.ROLE_ADMIN,
-                'secretaria': secretaria,
-            },
-        )
-        admin.set_password('admin123')
-        admin.is_staff = True
-        admin.save()
-        usuarios['admin'] = admin
+        for label, cfg in configs.items():
+            user, created = User.objects.get_or_create(
+                username=cfg['username'],
+                defaults={k: v for k, v in cfg['defaults'].items() if k not in {'is_staff', 'is_superuser'}}
+            )
 
-        professor, _ = User.objects.get_or_create(
-            username='prof_demo',
-            defaults={
-                'email': 'prof@example.com',
-                'role': User.ROLE_PROFESSOR,
-                'secretaria': secretaria,
-            },
-        )
-        professor.set_password('prof123')
-        professor.save()
-        usuarios['prof'] = professor
+            updated = False
+            for attr, value in cfg['defaults'].items():
+                if attr in {'secretaria'}:
+                    current_id = getattr(user, f'{attr}_id', None)
+                    if (value and current_id != value.id) or (value is None and getattr(user, attr) is not None):
+                        setattr(user, attr, value)
+                        updated = True
+                else:
+                    if getattr(user, attr, None) != value:
+                        setattr(user, attr, value)
+                        updated = True
+
+            if created or not user.has_usable_password():
+                user.set_password(cfg['password'])
+                updated = True
+
+            if updated:
+                user.save()
+
+            usuarios[label] = user
 
         return usuarios
 

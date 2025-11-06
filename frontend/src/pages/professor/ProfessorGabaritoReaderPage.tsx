@@ -1,4 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -7,14 +8,12 @@ import {
   Chip,
   Divider,
   FormControl,
-  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Paper,
   Select,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -34,8 +33,6 @@ import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { apiClient } from '../../api/client';
 import { QrScannerDialog } from '../../components/QrScannerDialog';
 import { PageContainer, PageHeader, PageSection } from '../../components/layout/Page';
-import { loadOpenCv } from '../../utils/opencv';
-import { analyzeOmrImage } from '../../omr/analysis';
 import type {
   Avaliacao,
   Caderno,
@@ -44,20 +41,6 @@ import type {
   ProvaAluno
 } from '../../types';
 
-interface ManualAreaParams {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
-interface NormalizedRect {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
 interface CellScore {
   letter: string;
   percent: number;
@@ -65,6 +48,7 @@ interface CellScore {
 
 interface QuestionAnalysis {
   ordem: number;
+  cadernoQuestao: number;
   scores: CellScore[];
   detected: string | null;
 }
@@ -76,73 +60,7 @@ interface AnalysisStats {
   samples: number;
 }
 
-interface AnalyzeResult {
-  area: NormalizedRect;
-  results: QuestionAnalysis[];
-  stats: AnalysisStats;
-}
-
-const DEFAULT_MANUAL_AREA: ManualAreaParams = {
-  top: 45,
-  left: 6,
-  width: 88,
-  height: 45
-};
-
-const MIN_THRESHOLD = 5;
-const MAX_THRESHOLD = 95;
-
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
-const GRID_COLUMNS_MM = [20, 16, 16, 16, 16, 16];
-const GRID_PADDING_MM = { top: 18, bottom: 18, left: 22, right: 22 } as const;
-const ROW_HEIGHT_MM = 12;
-const MARKER_SIZE_MM = 14;
-const MARKER_OFFSET_FROM_GRID_MM = 12 - MARKER_SIZE_MM / 2; // 5 mm entre centro do marcador e borda
-const PX_PER_MM = 10;
-
-const GRID_INNER_WIDTH_MM = GRID_COLUMNS_MM.reduce((acc, value) => acc + value, 0);
-const TOTAL_WIDTH_MM = GRID_INNER_WIDTH_MM + GRID_PADDING_MM.left + GRID_PADDING_MM.right;
-
-const computeTotalHeightMm = (rows: number) =>
-  GRID_PADDING_MM.top + GRID_PADDING_MM.bottom + ROW_HEIGHT_MM * rows;
-
-const computeNormalizedGridArea = (rows: number): NormalizedRect => {
-  const totalHeightMm = computeTotalHeightMm(rows);
-  return {
-    top: GRID_PADDING_MM.top / totalHeightMm,
-    left: GRID_PADDING_MM.left / TOTAL_WIDTH_MM,
-    width: GRID_INNER_WIDTH_MM / TOTAL_WIDTH_MM,
-    height: (ROW_HEIGHT_MM * rows) / totalHeightMm
-  };
-};
-
-function clamp01(value: number) {
-  if (Number.isNaN(value)) {
-    return 0;
-  }
-  return Math.min(Math.max(value, 0), 1);
-}
-
-function manualToNormalized(area: ManualAreaParams): NormalizedRect {
-  return {
-    top: clamp01(area.top / 100),
-    left: clamp01(area.left / 100),
-    width: clamp01(area.width / 100),
-    height: clamp01(area.height / 100)
-  };
-}
-
-function fetchNormalized(data: NormalizedRect | null): NormalizedRect {
-  if (!data || data.width <= 0 || data.height <= 0) {
-    return manualToNormalized(DEFAULT_MANUAL_AREA);
-  }
-  return {
-    top: clamp01(data.top),
-    left: clamp01(data.left),
-    width: clamp01(data.width),
-    height: clamp01(data.height)
-  };
-}
 
 async function fetchAvaliacoes(): Promise<Avaliacao[]> {
   const { data } = await apiClient.get<Avaliacao[] | PaginatedResponse<Avaliacao>>(
@@ -167,283 +85,6 @@ async function fetchCadernoQuestoes(cadernoId: number): Promise<CadernoQuestao[]
     params: { caderno_id: cadernoId, page_size: 0 }
   });
   return Array.isArray(data) ? data : data.results;
-}
-
-function detectAnswerGridBounds(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number
-): NormalizedRect | null {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const { data } = imageData;
-  const step = Math.max(4, Math.floor(Math.min(width, height) / 220));
-  const verticalStart = Math.floor(height * 0.18);
-  const horizontalPadding = Math.floor(width * 0.04);
-  let minX = width;
-  let maxX = 0;
-  let minY = height;
-  let maxY = 0;
-  let hasSamples = false;
-
-  for (let y = verticalStart; y < height; y += step) {
-    for (let x = horizontalPadding; x < width - horizontalPadding; x += step) {
-      const offset = (y * width + x) * 4;
-      const r = data[offset];
-      const g = data[offset + 1];
-      const b = data[offset + 2];
-      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      if (brightness < 0.7) {
-        hasSamples = true;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (!hasSamples || maxX <= minX || maxY <= minY) {
-    return null;
-  }
-
-  const marginX = Math.floor((maxX - minX) * 0.05);
-  const marginY = Math.floor((maxY - minY) * 0.05);
-  minX = Math.max(minX - marginX, 0);
-  minY = Math.max(minY - marginY, 0);
-  maxX = Math.min(maxX + marginX, width - 1);
-  maxY = Math.min(maxY + marginY, height - 1);
-
-  return {
-    top: clamp01(minY / height),
-    left: clamp01(minX / width),
-    width: clamp01((maxX - minX) / width),
-    height: clamp01((maxY - minY) / height)
-  };
-}
-
-async function attemptPerspectiveNormalization(
-  baseCanvas: HTMLCanvasElement,
-  rows: number
-): Promise<{ canvas: HTMLCanvasElement; normalizedArea: NormalizedRect } | null> {
-  try {
-    const cv = await loadOpenCv();
-    const src = cv.imread(baseCanvas);
-    const gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-    const blur = new cv.Mat();
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-    const binary = new cv.Mat();
-    cv.adaptiveThreshold(
-      blur,
-      binary,
-      255,
-      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-      cv.THRESH_BINARY_INV,
-      35,
-      12
-    );
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
-    cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-    type MarkerCandidate = {
-      center: { x: number; y: number };
-      size: number;
-    };
-    const markers: MarkerCandidate[] = [];
-
-    for (let i = 0; i < contours.size(); i += 1) {
-      const contour = contours.get(i);
-      const peri = cv.arcLength(contour, true);
-      const approx = new cv.Mat();
-      cv.approxPolyDP(contour, approx, 0.02 * peri, true);
-      if (approx.rows === 4 && cv.isContourConvex(approx)) {
-        const area = cv.contourArea(approx);
-        if (area < (src.cols * src.rows) * 0.005) {
-          approx.delete();
-          contour.delete();
-          continue;
-        }
-        const rect = cv.boundingRect(approx);
-        const aspect = rect.width / rect.height;
-        if (aspect < 0.75 || aspect > 1.25) {
-          approx.delete();
-          contour.delete();
-          continue;
-        }
-        const moments = cv.moments(approx);
-        if (moments.m00 === 0) {
-          approx.delete();
-          contour.delete();
-          continue;
-        }
-        const center = {
-          x: moments.m10 / moments.m00,
-          y: moments.m01 / moments.m00
-        };
-        markers.push({ center, size: (rect.width + rect.height) / 2 });
-        approx.delete();
-      } else {
-        approx.delete();
-      }
-      contour.delete();
-    }
-
-    contours.delete();
-    hierarchy.delete();
-    binary.delete();
-    blur.delete();
-    gray.delete();
-
-    if (markers.length < 4) {
-      src.delete();
-      return null;
-    }
-
-    const orderedMarkers = markers
-      .sort((a, b) => b.size - a.size)
-      .slice(0, 4)
-      .sort((a, b) => a.center.y - b.center.y);
-
-    const topPair = orderedMarkers.slice(0, 2).sort((a, b) => a.center.x - b.center.x);
-    const bottomPair = orderedMarkers.slice(2, 4).sort((a, b) => a.center.x - b.center.x);
-    const arranged = [topPair[0], topPair[1], bottomPair[0], bottomPair[1]];
-
-    const avgMarkerSize = arranged.reduce((acc, marker) => acc + marker.size, 0) / arranged.length;
-    const pxPerMm = avgMarkerSize / MARKER_SIZE_MM;
-    const offsetPx = pxPerMm * MARKER_OFFSET_FROM_GRID_MM;
-
-    const srcPoints = [
-      { x: arranged[0].center.x + offsetPx, y: arranged[0].center.y + offsetPx },
-      { x: arranged[1].center.x - offsetPx, y: arranged[1].center.y + offsetPx },
-      { x: arranged[2].center.x + offsetPx, y: arranged[2].center.y - offsetPx },
-      { x: arranged[3].center.x - offsetPx, y: arranged[3].center.y - offsetPx }
-    ];
-
-    const totalHeightMm = computeTotalHeightMm(rows);
-    const destWidth = Math.round(TOTAL_WIDTH_MM * PX_PER_MM);
-    const destHeight = Math.round(totalHeightMm * PX_PER_MM);
-
-    const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-      srcPoints[0].x,
-      srcPoints[0].y,
-      srcPoints[1].x,
-      srcPoints[1].y,
-      srcPoints[2].x,
-      srcPoints[2].y,
-      srcPoints[3].x,
-      srcPoints[3].y
-    ]);
-    const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-      0,
-      0,
-      destWidth,
-      0,
-      0,
-      destHeight,
-      destWidth,
-      destHeight
-    ]);
-
-    const transform = cv.getPerspectiveTransform(srcTri, dstTri);
-    const warped = new cv.Mat();
-    cv.warpPerspective(
-      src,
-      warped,
-      transform,
-      new cv.Size(destWidth, destHeight),
-      cv.INTER_LINEAR,
-      cv.BORDER_CONSTANT,
-      new cv.Scalar(255, 255, 255, 255)
-    );
-
-    const warpCanvas = document.createElement('canvas');
-    warpCanvas.width = destWidth;
-    warpCanvas.height = destHeight;
-    cv.imshow(warpCanvas, warped);
-
-    warped.delete();
-    transform.delete();
-    srcTri.delete();
-    dstTri.delete();
-    src.delete();
-
-    return {
-      canvas: warpCanvas,
-      normalizedArea: computeNormalizedGridArea(rows)
-    };
-  } catch (error) {
-    console.error('Perspective normalization failed', error);
-    return null;
-  }
-}
-
-async function analyzeGabaritoImage(
-  imageSrc: string,
-  questoes: CadernoQuestao[],
-  options: { threshold: number; area?: NormalizedRect }
-): Promise<AnalyzeResult> {
-  if (!questoes.length) {
-    return {
-      area: manualToNormalized(DEFAULT_MANUAL_AREA),
-      results: [],
-      stats: { mean: 0, stddev: 0, threshold: clamp01(options.threshold), samples: 0 }
-    };
-  }
-
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = (err) => reject(err);
-    img.src = imageSrc;
-  });
-
-  const baseCanvas = document.createElement('canvas');
-  baseCanvas.width = image.width;
-  baseCanvas.height = image.height;
-  const baseCtx = baseCanvas.getContext('2d');
-  if (!baseCtx) {
-    throw new Error('Canvas não suportado.');
-  }
-  baseCtx.drawImage(image, 0, 0);
-
-  let normalizedArea: NormalizedRect | null = options.area ?? null;
-  if (!normalizedArea) {
-    const detectedArea = detectAnswerGridBounds(baseCtx, baseCanvas.width, baseCanvas.height);
-    normalizedArea = fetchNormalized(detectedArea);
-  }
-
-  let workingCanvas: HTMLCanvasElement = baseCanvas;
-  let workingArea: NormalizedRect = normalizedArea;
-
-  const warpResult = await attemptPerspectiveNormalization(baseCanvas, questoes.length);
-  if (warpResult) {
-    workingCanvas = warpResult.canvas;
-    workingArea = warpResult.normalizedArea;
-  }
-
-  const questoesOrdem = questoes.map((questao) => questao.ordem);
-  const omrOutcome = await analyzeOmrImage(workingCanvas, questoesOrdem, {
-    rows: questoes.length,
-    columns: LETTERS.length,
-    normalizedArea: workingArea,
-    sensitivity: options.threshold
-  });
-
-  const results: QuestionAnalysis[] = omrOutcome.results.map((item) => ({
-    ordem: item.ordem,
-    detected: item.detected,
-    scores: item.scores.map((score) => ({
-      letter: score.letter,
-      percent: score.percent
-    }))
-  }));
-
-  return {
-    area: workingArea,
-    results,
-    stats: omrOutcome.stats
-  };
 }
 
 function parseProvaId(rawValue: string): number | null {
@@ -490,10 +131,6 @@ export function ProfessorGabaritoReaderPage() {
     enabled: cadernoId > 0
   });
 
-  const [manualArea, setManualArea] = useState<ManualAreaParams>(DEFAULT_MANUAL_AREA);
-  const [threshold, setThreshold] = useState<number>(38);
-  const [useAutoArea, setUseAutoArea] = useState<boolean>(true);
-  const [answerArea, setAnswerArea] = useState<NormalizedRect>(manualToNormalized(DEFAULT_MANUAL_AREA));
   const [cameraActive, setCameraActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<QuestionAnalysis[]>([]);
@@ -570,7 +207,6 @@ export function ProfessorGabaritoReaderPage() {
     setProvaInfo(null);
     setAnalysisError(null);
     setAnalysisStats(null);
-    setAnswerArea(useAutoArea ? answerArea : manualToNormalized(manualArea));
   };
 
   const handleStartCamera = () => {
@@ -605,17 +241,6 @@ export function ProfessorGabaritoReaderPage() {
       streamRef.current = null;
     }
 
-    if (useAutoArea) {
-      try {
-        const detected = detectAnswerGridBounds(ctx, canvas.width, canvas.height);
-        setAnswerArea(fetchNormalized(detected));
-      } catch (err) {
-        console.error(err);
-        setAnswerArea(manualToNormalized(DEFAULT_MANUAL_AREA));
-      }
-    } else {
-      setAnswerArea(manualToNormalized(manualArea));
-    }
   };
 
   const handleReset = () => {
@@ -627,56 +252,62 @@ export function ProfessorGabaritoReaderPage() {
     resetWorkflow();
   };
 
-  const handleManualAreaChange =
-    (field: keyof ManualAreaParams) => (event: ChangeEvent<HTMLInputElement>) => {
-      const value = Number(event.target.value);
-      setManualArea((prev) => {
-        const updated = { ...prev, [field]: Number.isFinite(value) ? value : prev[field] };
-        if (!useAutoArea) {
-          setAnswerArea(manualToNormalized(updated));
-        }
-        return updated;
-      });
-    };
-
-  const handleThresholdChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value)) {
-      setThreshold(Math.min(Math.max(value, MIN_THRESHOLD), MAX_THRESHOLD));
-    }
-  };
-
-  const handleToggleAutoArea = (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
-    setUseAutoArea(checked);
-    if (!checked) {
-      setAnswerArea(manualToNormalized(manualArea));
-    }
-  };
-
   const handleAnalyze = async () => {
     if (!capturedImage) {
       setAnalysisError('Capture a imagem do gabarito antes de analisar.');
       return;
     }
-    if (questoesOrdenadas.length === 0) {
+    if (questoesOrdenadas.length === 0 || !cadernoId) {
       setAnalysisError('Selecione um caderno com questões cadastradas.');
       return;
     }
     try {
       setAnalysisError(null);
-      const result = await analyzeGabaritoImage(capturedImage, questoesOrdenadas, {
-        threshold: clamp01(threshold / 100),
-        area: useAutoArea ? undefined : manualToNormalized(manualArea)
+      setFeedback(null);
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
+      const formData = new FormData();
+      formData.append('caderno_id', String(cadernoId));
+      formData.append('imagem', blob, 'gabarito.png');
+
+      const { data } = await apiClient.post<{
+        results: {
+          ordem: number;
+          caderno_questao: number;
+          detected: string | null;
+          scores: CellScore[];
+        }[];
+        stats: AnalysisStats;
+        detected_count: number;
+      }>('/respostas/omr/analisar/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setAnswerArea(result.area);
-      setAnalysis(result.results);
-      setAnalysisStats(result.stats);
+
+      const mappedResults: QuestionAnalysis[] = data.results.map((item) => ({
+        ordem: item.ordem,
+        cadernoQuestao: item.caderno_questao,
+        detected: item.detected,
+        scores: item.scores
+      }));
+
+      setAnalysis(mappedResults);
+      setAnalysisStats(data.stats);
       setFeedback(
-        `Leitura concluída. Foram detectadas ${result.results.filter((item) => item.detected).length} respostas.`
+        `Leitura concluída. Foram detectadas ${data.detected_count} respostas com boa confiança.`
       );
     } catch (err) {
       console.error(err);
-      setAnalysisError('Falha ao processar a imagem. Ajuste os marcadores ou capture novamente.');
+      if (isAxiosError(err)) {
+        const detail = err.response?.data?.detail;
+        if (typeof detail === 'string' && detail.trim().length > 0) {
+          setAnalysisError(detail);
+          setAnalysisStats(null);
+          return;
+        }
+      }
+      setAnalysisError(
+        'Falha ao processar a imagem. Verifique o enquadramento do gabarito e tente novamente.'
+      );
       setAnalysisStats(null);
     }
   };
@@ -932,18 +563,6 @@ export function ProfessorGabaritoReaderPage() {
                     alt="Gabarito capturado"
                     sx={{ width: '100%', display: 'block' }}
                   />
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: `${answerArea.top * 100}%`,
-                      left: `${answerArea.left * 100}%`,
-                      width: `${answerArea.width * 100}%`,
-                      height: `${answerArea.height * 100}%`,
-                      border: '2px dashed rgba(255, 255, 255, 0.85)',
-                      boxShadow: '0 0 0 2000px rgba(0,0,0,0.28)',
-                      pointerEvents: 'none'
-                    }}
-                  />
                 </Box>
               </Box>
             ) : (
@@ -961,56 +580,10 @@ export function ProfessorGabaritoReaderPage() {
         <PageSection>
           <Stack spacing={2}>
             <Typography variant="h6">2. Ajuste e análise do gabarito</Typography>
-            <FormControlLabel
-              control={<Switch checked={useAutoArea} onChange={handleToggleAutoArea} />}
-              label="Detectar área automaticamente"
-            />
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <TextField
-                label="Posição superior (%)"
-                type="number"
-                value={manualArea.top}
-                onChange={handleManualAreaChange('top')}
-                helperText="Ajusta o início vertical da tabela."
-                inputProps={{ min: 0, max: 100 }}
-                disabled={useAutoArea}
-              />
-              <TextField
-                label="Posição esquerda (%)"
-                type="number"
-                value={manualArea.left}
-                onChange={handleManualAreaChange('left')}
-                helperText="Ajusta a margem esquerda."
-                inputProps={{ min: 0, max: 100 }}
-                disabled={useAutoArea}
-              />
-              <TextField
-                label="Largura (%)"
-                type="number"
-                value={manualArea.width}
-                onChange={handleManualAreaChange('width')}
-                helperText="Ajusta a largura do quadro."
-                inputProps={{ min: 5, max: 100 }}
-                disabled={useAutoArea}
-              />
-              <TextField
-                label="Altura (%)"
-                type="number"
-                value={manualArea.height}
-                onChange={handleManualAreaChange('height')}
-                helperText="Ajusta a altura total."
-                inputProps={{ min: 5, max: 100 }}
-                disabled={useAutoArea}
-              />
-              <TextField
-                label="Sensibilidade (%)"
-                type="number"
-                value={threshold}
-                onChange={handleThresholdChange}
-                helperText="Quanto maior, mais preenchido o quadrado precisa estar."
-                inputProps={{ min: MIN_THRESHOLD, max: MAX_THRESHOLD }}
-              />
-            </Stack>
+            <Typography variant="body2" color="text.secondary">
+              O gabarito capturado será processado pelo leitor automático baseado em OpenCV. Caso a
+              leitura não identifique todas as respostas, ajuste manualmente na tabela abaixo.
+            </Typography>
             <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
