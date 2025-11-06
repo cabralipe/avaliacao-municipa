@@ -153,27 +153,52 @@
       }
 
       .answer-grid {
-        --grid-width: 144mm;
-        --grid-padding-top: 18mm;
-        --grid-padding-bottom: 18mm;
+        --grid-width: 136mm;
+        --grid-padding-top: 20mm;
+        --grid-padding-bottom: 20mm;
         --grid-padding-left: 22mm;
         --grid-padding-right: 22mm;
-        --row-height: 12mm;
-        --column-question-width: 20mm;
-        --column-option-width: 16mm;
+        --row-height: 11mm;
+        --column-question-width: 22mm;
+        --column-option-width: 14mm;
         --marker-size: 14mm;
         --marker-offset: 12mm;
         position: relative;
         width: var(--grid-width);
         margin: 14px auto 0;
         border: 4px solid #000;
-        border-radius: 0;
+        border-radius: 3mm;
         background-color: #fff;
+        background-image: linear-gradient(
+            to right,
+            rgba(0, 0, 0, 0.05) 1px,
+            transparent 1px
+          ),
+          repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.04) 0,
+            rgba(0, 0, 0, 0.04) 1px,
+            transparent 1px,
+            transparent calc(var(--row-height))
+          ),
+          repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.14) 0,
+            rgba(0, 0, 0, 0.14) 1.8px,
+            transparent 1.8px,
+            transparent calc(var(--row-height) * 5)
+          );
+        background-size:
+          calc(var(--column-option-width)) calc(var(--row-height)),
+          100% calc(var(--row-height)),
+          100% calc(var(--row-height) * 5);
+        background-position: var(--grid-padding-left) var(--grid-padding-top);
         padding: var(--grid-padding-top) var(--grid-padding-right) var(--grid-padding-bottom)
           var(--grid-padding-left);
         min-height: calc(
           var(--grid-padding-top) + var(--grid-padding-bottom) + var(--rows) * var(--row-height)
         );
+        box-shadow: inset 0 0 0 1mm rgba(0, 0, 0, 0.08);
       }
 
       .answer-grid table {
@@ -202,6 +227,10 @@
         padding: 0;
       }
 
+      .answer-grid tbody tr:nth-child(odd) td {
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+
       .answer-grid .question-cell {
         width: var(--column-question-width);
         text-align: left;
@@ -212,15 +241,17 @@
 
       .answer-grid .option-cell {
         width: var(--column-option-width);
+        position: relative;
       }
 
       .answer-grid .mark-box {
         display: inline-block;
-        width: 11mm;
-        height: 11mm;
+        width: 9.5mm;
+        height: 9.5mm;
         border: 2px solid #000;
         border-radius: 50%;
         background-color: #fff;
+        box-shadow: inset 0 0 0 1mm rgba(0, 0, 0, 0.02);
       }
 
       .answer-grid .marker {
@@ -230,6 +261,16 @@
         background-color: #111;
         border-radius: 2mm;
         box-shadow: 0 0 0 2px #111;
+        z-index: 0;
+      }
+
+      .answer-grid .marker-edge {
+        position: absolute;
+        width: 6mm;
+        height: 6mm;
+        border-radius: 50%;
+        background-color: #111;
+        box-shadow: 0 0 0 1px #111;
         z-index: 0;
       }
 
@@ -251,6 +292,18 @@
       .answer-grid .marker-bottom-right {
         bottom: calc(var(--marker-offset) * -1);
         right: calc(var(--marker-offset) * -1);
+      }
+
+      .answer-grid .marker-mid-left {
+        top: 50%;
+        left: calc(var(--marker-offset) * -1);
+        transform: translate(-40%, -50%);
+      }
+
+      .answer-grid .marker-mid-right {
+        top: 50%;
+        right: calc(var(--marker-offset) * -1);
+        transform: translate(40%, -50%);
       }
 
       .answer-grid .marker::after,
@@ -325,7 +378,8 @@
             <li>Confira seus dados antes de iniciar a prova.</li>
             <li>Responda às questões nas páginas seguintes e marque o gabarito na última página.</li>
             <li>Ao digitalizar o gabarito, mantenha os marcadores pretos dentro do enquadramento da câmera.</li>
-            <li>Mantenha o gabarito limpo e sem rasuras para facilitar a leitura digital.</li>
+            <li>Use caneta ou lápis grafite escuro para preencher completamente as bolhas.</li>
+            <li>Mantenha o gabarito limpo, sem rasuras e sem dobrar as margens para facilitar a leitura digital.</li>
           </ul>
         </div>
       </div>
@@ -361,6 +415,8 @@
         <span class="marker marker-top-right"></span>
         <span class="marker marker-bottom-left"></span>
         <span class="marker marker-bottom-right"></span>
+        <span class="marker-edge marker-mid-left"></span>
+        <span class="marker-edge marker-mid-right"></span>
         <span class="vertical-guide guide-1"></span>
         <span class="vertical-guide guide-2"></span>
         <table>
@@ -397,7 +453,7 @@
         </table>
       </div>
       <p class="hint">
-        Após preencher, utilize o leitor de gabarito para capturar as respostas e, em seguida, apresente o QR Code para vincular esta prova ao aluno.
+        Após preencher, utilize o leitor de gabarito para enquadrar toda a folha. Aguarde a confirmação visual na tela e, em seguida, apresente o QR Code para vincular esta prova ao aluno.
       </p>
     </section>
   </body>

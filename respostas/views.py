@@ -1,3 +1,5 @@
+import time
+
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,6 +17,26 @@ from .serializers import (
 )
 from .services import corrigir_prova
 from .omr import analyze_omr_image, OmrProcessingError
+
+_CADERNO_CACHE: dict[int, tuple[float, list[tuple[int, int]]]] = {}
+_CACHE_TTL_SECONDS = 300
+
+
+def _get_caderno_questoes(caderno_id: int) -> list[tuple[int, int]]:
+    now = time.time()
+    cached = _CADERNO_CACHE.get(caderno_id)
+    if cached:
+        cached_at, data = cached
+        if now - cached_at <= _CACHE_TTL_SECONDS:
+            return data
+
+    questoes = list(
+        CadernoQuestao.objects.filter(caderno_id=caderno_id)
+        .order_by('ordem')
+        .values_list('ordem', 'id')
+    )
+    _CADERNO_CACHE[caderno_id] = (now, questoes)
+    return questoes
 
 
 class RespostaViewSet(TenantScopedViewSet):
@@ -111,11 +133,7 @@ class AnaliseGabaritoView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        questoes = list(
-            CadernoQuestao.objects.filter(caderno=caderno)
-            .order_by('ordem')
-            .values_list('ordem', 'id')
-        )
+        questoes = _get_caderno_questoes(caderno.id)
         if not questoes:
             return Response(
                 {'detail': 'Nenhuma questão cadastrada para este caderno.'},
